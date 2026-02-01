@@ -7,8 +7,31 @@
   const statusEl = document.getElementById("status");
   const sendBtn = document.getElementById("send-btn");
   const newChatBtn = document.getElementById("new-chat-btn");
+  const modelSelect = document.getElementById("model-select");
 
   let conversation = [];
+
+  async function loadModels() {
+    if (!modelSelect) return;
+    try {
+      const res = await fetch("/models");
+      const data = await res.json();
+      const models = data.models || [];
+      modelSelect.innerHTML = "";
+      if (models.length === 0) {
+        modelSelect.innerHTML = '<option value="">No models found</option>';
+        return;
+      }
+      models.forEach(function (name) {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        modelSelect.appendChild(opt);
+      });
+    } catch (err) {
+      modelSelect.innerHTML = '<option value="">Failed to load models</option>';
+    }
+  }
 
   function startNewChat() {
     conversation = [];
@@ -68,6 +91,13 @@
     addMessage("user", text);
     conversation.push({ role: "user", content: text });
 
+    const model = modelSelect ? modelSelect.value : "";
+    if (!model) {
+      addMessage("assistant", "Please select a model from the dropdown.", true);
+      setStatus("", "error");
+      return;
+    }
+
     sendBtn.disabled = true;
     showTyping(true);
     setStatus("");
@@ -80,7 +110,7 @@
       const res = await fetch("/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: conversation }),
+        body: JSON.stringify({ messages: conversation, model: model }),
       });
 
       if (!res.ok) {
@@ -142,6 +172,7 @@
 
   if (newChatBtn) newChatBtn.addEventListener("click", startNewChat);
 
+  loadModels();
   if (emptyState) showEmptyState(true);
   input.focus();
 })();
