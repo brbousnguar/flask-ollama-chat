@@ -1,0 +1,13 @@
+services:
+  ai-chat-assistant:
+    build: .
+    container_name: ai-chat-assistant
+    ports:
+      - "5000:5000"
+    environment:
+      - OLLAMA_BASE_URL=http://172.17.0.1:11434
+      - OLLAMA_MODEL=gpt-oss:latest
+    restart: unless-stopped
+    network_mode: bridge
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
