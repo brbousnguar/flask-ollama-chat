@@ -72,3 +72,4 @@ On GitHub, the **default branch** should be `main` (not a feature branch). If it
 - Prefer **conventional commit** prefixes: `feat:`, `fix:`, `chore:`, `docs:`.
 - Commit message must describe the **actual change** (e.g. `feat:add-new-chat-button`), not a placeholder.
 - Branch name must be **feat/[what-you-did]** (e.g. `feat/add-new-chat-button`), not a literal like `feat/what-i-did`.
+- **Do not** include "Made with Cursor" or similar tool attribution in PR descriptions or commit messages.
