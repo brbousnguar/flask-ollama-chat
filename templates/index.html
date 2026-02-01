@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css?v=2">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-badge">
+        <span class="header-icon" aria-hidden="true">◆</span>
+        <span>AI Assistant</span>
+      </div>
+      <p class="subtitle">Powered by Ollama · gpt-oss:latest</p>
+    </header>
+
+    <main class="chat-container">
+      <div id="messages" class="messages" role="log" aria-live="polite">
+        <div id="empty-state" class="empty-state">
+          <div class="empty-state-icon" aria-hidden="true">✧</div>
+          <p class="empty-state-title">Start a conversation</p>
+          <p class="empty-state-text">Send a message to get started.</p>
+        </div>
+      </div>
+
+      <div id="typing-indicator" class="typing-indicator" aria-hidden="true" hidden>
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+      </div>
+
+      <form id="chat-form" class="input-row" aria-label="Send a message">
+        <input
+          id="user-input"
+          type="text"
+          placeholder="Type a message..."
+          autocomplete="off"
+          aria-label="Message"
+        />
+        <button type="submit" id="send-btn" class="send-btn" aria-label="Send">
+          <span class="send-icon" aria-hidden="true">→</span>
+        </button>
+      </form>
+
+      <div id="status" class="status" aria-live="polite"></div>
+    </main>
+  </div>
+
+  <script src="/static/app.js?v=2"></script>
+</body>
+</html>
