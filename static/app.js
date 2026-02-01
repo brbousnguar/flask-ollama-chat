@@ -6,8 +6,19 @@
   const typingIndicator = document.getElementById("typing-indicator");
   const statusEl = document.getElementById("status");
   const sendBtn = document.getElementById("send-btn");
+  const newChatBtn = document.getElementById("new-chat-btn");
 
   let conversation = [];
+
+  function startNewChat() {
+    conversation = [];
+    setStatus("");
+    showTyping(false);
+    while (messagesEl.firstChild) messagesEl.removeChild(messagesEl.firstChild);
+    if (emptyState) messagesEl.appendChild(emptyState);
+    showEmptyState(true);
+    input.focus();
+  }
 
   function setStatus(text, type = "") {
     statusEl.textContent = text;
@@ -128,6 +139,8 @@
     e.preventDefault();
     sendMessage();
   });
+
+  if (newChatBtn) newChatBtn.addEventListener("click", startNewChat);
 
   if (emptyState) showEmptyState(true);
   input.focus();
