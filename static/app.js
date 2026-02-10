@@ -426,6 +426,95 @@
     if (e.target === modelModal) closeModelModal();
   });
 
+  // Accessibility panel logic
+  const accessBtn = document.getElementById('access-btn');
+  const accessPanel = document.getElementById('access-panel');
+  const accessClose = document.getElementById('access-close');
+  const fontBtns = document.querySelectorAll('.font-btn');
+  const themeBtns = document.querySelectorAll('.theme-btn');
+  const weightBtns = document.querySelectorAll('.weight-btn');
+  const accessReset = document.getElementById('access-reset');
+
+  function applyAccessibility(settings) {
+    // settings: { size: 'md'|'sm'|'lg', theme: 'dark'|'light'|'sepia', weight: 'normal'|'bold' }
+    const root = document.documentElement;
+    // remove previous theme classes
+    root.classList.remove('theme-light', 'theme-sepia');
+    if (settings.theme === 'light') root.classList.add('theme-light');
+    if (settings.theme === 'sepia') root.classList.add('theme-sepia');
+
+    // font sizes on .app
+    const appEl = document.querySelector('.app');
+    appEl.classList.remove('font-sm','font-md','font-lg');
+    appEl.classList.add(settings.size ? ('font-' + settings.size) : 'font-md');
+
+    // weight
+    appEl.classList.remove('weight-normal','weight-bold');
+    appEl.classList.add(settings.weight === 'bold' ? 'weight-bold' : 'weight-normal');
+
+    // update active buttons
+    fontBtns.forEach(b => b.classList.toggle('active', b.dataset.size === settings.size));
+    themeBtns.forEach(b => b.classList.toggle('active', b.dataset.theme === settings.theme));
+    weightBtns.forEach(b => b.classList.toggle('active', b.dataset.weight === settings.weight));
+  }
+
+  function saveAccessibility(settings) {
+    try { localStorage.setItem('accessibility', JSON.stringify(settings)); } catch(e){}
+  }
+
+  function loadAccessibility() {
+    try { return JSON.parse(localStorage.getItem('accessibility') || 'null'); } catch(e) { return null; }
+  }
+
+  function openAccessPanel() {
+    if (!accessPanel) return;
+    accessPanel.setAttribute('aria-hidden','false');
+    if (accessBtn) accessBtn.setAttribute('aria-expanded','true');
+  }
+  function closeAccessPanel() {
+    if (!accessPanel) return;
+    accessPanel.setAttribute('aria-hidden','true');
+    if (accessBtn) accessBtn.setAttribute('aria-expanded','false');
+  }
+
+  if (accessBtn) accessBtn.addEventListener('click', openAccessPanel);
+  if (accessClose) accessClose.addEventListener('click', closeAccessPanel);
+  if (accessPanel) accessPanel.addEventListener('click', function(e){ if (e.target === accessPanel) closeAccessPanel(); });
+
+  fontBtns.forEach(b => b.addEventListener('click', function(){
+    const size = b.dataset.size || 'md';
+    const settings = Object.assign({size:size}, loadAccessibility() || {});
+    settings.size = size;
+    applyAccessibility(settings);
+    saveAccessibility(settings);
+  }));
+
+  themeBtns.forEach(b => b.addEventListener('click', function(){
+    const theme = b.dataset.theme || 'dark';
+    const settings = Object.assign({theme:theme}, loadAccessibility() || {});
+    settings.theme = theme;
+    applyAccessibility(settings);
+    saveAccessibility(settings);
+  }));
+
+  weightBtns.forEach(b => b.addEventListener('click', function(){
+    const weight = b.dataset.weight || 'normal';
+    const settings = Object.assign({weight:weight}, loadAccessibility() || {});
+    settings.weight = weight;
+    applyAccessibility(settings);
+    saveAccessibility(settings);
+  }));
+
+  if (accessReset) accessReset.addEventListener('click', function(){
+    const defaults = { size: 'md', theme: 'dark', weight: 'normal' };
+    applyAccessibility(defaults);
+    saveAccessibility(defaults);
+  });
+
+  // Apply saved settings on load
+  const saved = loadAccessibility();
+  if (saved) applyAccessibility(saved);
+
   loadModels();
   if (emptyState) showEmptyState(true);
   // update padding and scroll on load

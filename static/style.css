@@ -30,6 +30,35 @@
   --transition: 0.2s ease;
 }
 
+/* Accessibility themes (override color vars when applied) */
+.theme-light {
+  --bg: #f6f6f8;
+  --bg-soft: #ffffff;
+  --surface: #ffffff;
+  --surface-elevated: #fafafa;
+  --border: #e6e6ea;
+  --border-soft: #ededf2;
+  --text: #121217;
+  --text-muted: #4b4b57;
+  --text-subtle: #6b6b73;
+}
+
+.theme-sepia {
+  --bg: #fbf6ed;
+  --bg-soft: #fbf6ed;
+  --surface: #fff8ee;
+  --surface-elevated: #fff3e0;
+  --border: #efe7da;
+  --text: #2b2b22;
+  --text-muted: #6a5b4a;
+  --text-subtle: #8a7a66;
+  /* Ensure message bubbles and code blocks contrast correctly in sepia */
+  --assistant-msg-bg: #fff3e0;
+  --assistant-msg-border: #efe7da;
+  --code-bg: #0b0b0e;
+  --code-text: #e6e6e9;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -62,6 +91,82 @@ body::before {
   flex-direction: column;
   padding: 1.5rem;
 }
+
+/* Accessibility panel */
+.access-panel {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.45);
+  z-index: 120;
+}
+.access-panel[aria-hidden="false"] { display:flex; }
+.access-sheet {
+  width: 94%;
+  max-width: 520px;
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+}
+.access-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.5rem; }
+.access-close { background: transparent; border:none; color:var(--text); font-size:1.1rem; }
+.access-group { margin:0.6rem 0; }
+.access-group label { display:block; color:var(--text-muted); font-size:0.9rem; margin-bottom:0.4rem; }
+.access-controls { display:flex; gap:0.5rem; flex-wrap:wrap; }
+.access-controls button { padding:0.45rem 0.65rem; border-radius:8px; border:1px solid var(--border); background:var(--surface-elevated); color:var(--text); cursor:pointer; }
+.access-controls .font-btn { min-width: 48px; padding: 0.45rem 0.6rem; font-weight: 700; font-size: 0.95rem; display: inline-flex; align-items: center; justify-content: center; }
+.access-controls .theme-btn, .access-controls .weight-btn { min-width: 68px; }
+
+/* Header accessibility trigger (small Aa button) */
+#access-btn {
+  padding: 0.25rem 0.45rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-elevated);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+#access-btn[aria-expanded="true"] { box-shadow: 0 6px 18px rgba(139,92,246,0.12); border-color: transparent; background: var(--accent); color: #fff; }
+.access-controls button.active { background:var(--accent); color:white; border-color:transparent; box-shadow: 0 6px 18px rgba(139,92,246,0.12); }
+.access-reset { padding:0.6rem 0.85rem; border-radius:8px; background:transparent; border:1px solid var(--border); color:var(--text-muted); }
+
+/* Font-size classes */
+.font-sm { font-size: 14px; }
+.font-md { font-size: 15.5px; }
+.font-lg { font-size: 17px; }
+
+/* Apply accessibility font-size choices to app-scoped UI elements.
+  Many components use rem units which are rooted to <html>, so setting
+  font-size on .app won't affect them. These selectors explicitly
+  adjust key UI elements when a font size is chosen. */
+.app.font-sm .message { font-size: 0.875rem; }
+.app.font-md .message { font-size: 0.9375rem; }
+.app.font-lg .message { font-size: 1.0625rem; }
+
+.app.font-sm #user-input { font-size: 0.9rem; }
+.app.font-md #user-input { font-size: 0.95rem; }
+.app.font-lg #user-input { font-size: 1.05rem; }
+
+.app.font-sm .empty-state-title { font-size: 1rem; }
+.app.font-md .empty-state-title { font-size: 1.125rem; }
+.app.font-lg .empty-state-title { font-size: 1.25rem; }
+
+.app.font-sm .empty-state-text { font-size: 0.85rem; }
+.app.font-md .empty-state-text { font-size: 0.95rem; }
+.app.font-lg .empty-state-text { font-size: 1.05rem; }
+
+.app.font-sm .md-h2, .app.font-sm .md-h3 { font-size: 0.95rem; }
+.app.font-md .md-h2, .app.font-md .md-h3 { font-size: 1.05rem; }
+.app.font-lg .md-h2, .app.font-lg .md-h3 { font-size: 1.15rem; }
+
+/* Weight */
+.weight-normal { font-weight: 400; }
+.weight-bold { font-weight: 600; }
 
 /* Mobile-first tweaks for modern phones (iPhone 17, Galaxy S24) */
 :root {
@@ -575,7 +680,7 @@ body::before {
 .message .md-h4 { font-size: 0.95rem; margin: 0.25rem 0; color: var(--text-subtle); }
 .message p { margin: 0.45rem 0; color: var(--text); }
 .message .md-inline-code { background: rgba(255,255,255,0.04); padding: 0.12rem 0.28rem; border-radius: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', 'Courier New', monospace; font-size: 0.88rem; }
-.message .md-code { background: #0b0b0e; padding: 0.75rem; border-radius: 10px; overflow: auto; color: #e6e6e9; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', monospace; font-size: 0.9rem; }
+.message .md-code { background: var(--code-bg, #0b0b0e); padding: 0.75rem; border-radius: 10px; overflow: auto; color: var(--code-text, #e6e6e9); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', monospace; font-size: 0.9rem; }
 .message .md-ul { padding-left: 1rem; margin: 0.3rem 0; }
 .message .md-ul li { margin: 0.25rem 0; }
 .md-table-wrap { overflow:auto; margin: 0.5rem 0; }

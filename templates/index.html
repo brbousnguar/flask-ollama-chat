@@ -28,6 +28,7 @@
             </select>
           </div>
           <button type="button" id="new-chat-btn" class="new-chat-btn" aria-label="Start new chat">New chat</button>
+          <button id="access-btn" class="access-btn" aria-haspopup="true" aria-expanded="false" aria-controls="access-panel" title="Accessibility options">Aa</button>
         </div>
       </div>
       <p class="subtitle">Powered by Ollama</p>
@@ -73,6 +74,46 @@
         <button id="model-modal-close" class="model-modal-close" aria-label="Close">✕</button>
       </div>
       <div id="model-modal-list" class="model-modal-list" role="list"></div>
+    </div>
+  </div>
+
+  <!-- Accessibility panel -->
+  <div id="access-panel" class="access-panel" role="dialog" aria-hidden="true" aria-labelledby="access-title">
+    <div class="access-sheet">
+      <div class="access-header">
+        <h3 id="access-title">Accessibility</h3>
+        <button id="access-close" class="access-close" aria-label="Close accessibility panel">✕</button>
+      </div>
+
+      <div class="access-group">
+        <label>Font size</label>
+        <div class="access-controls">
+          <button class="font-btn" data-size="sm" aria-label="Small font">A</button>
+          <button class="font-btn" data-size="md" aria-label="Medium font">AA</button>
+          <button class="font-btn" data-size="lg" aria-label="Large font">AAA</button>
+        </div>
+      </div>
+
+      <div class="access-group">
+        <label>Theme</label>
+        <div class="access-controls">
+          <button class="theme-btn" data-theme="dark">Dark</button>
+          <button class="theme-btn" data-theme="light">Light</button>
+          <button class="theme-btn" data-theme="sepia">Sepia</button>
+        </div>
+      </div>
+
+      <div class="access-group">
+        <label>Weight</label>
+        <div class="access-controls">
+          <button class="weight-btn" data-weight="normal">Normal</button>
+          <button class="weight-btn" data-weight="bold">Bold</button>
+        </div>
+      </div>
+
+      <div class="access-group small">
+        <button id="access-reset" class="access-reset">Reset to defaults</button>
+      </div>
     </div>
   </div>
 
