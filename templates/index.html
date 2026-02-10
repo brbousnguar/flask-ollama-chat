@@ -13,14 +13,22 @@
   <div class="app">
     <header class="header">
       <div class="header-row">
-        <div class="header-badge">
-          <span class="header-icon" aria-hidden="true">◆</span>
-          <span>AI Assistant</span>
+        <div class="header-left">
+          <div class="header-badge">
+            <span class="header-icon" aria-hidden="true">◆</span>
+            <span>AI Assistant</span>
+          </div>
+          <div id="model-badge" class="model-badge" aria-live="polite" title="Models available">…</div>
         </div>
-        <select id="model-select" class="model-select" aria-label="Select model">
-          <option value="">Loading models…</option>
-        </select>
-        <button type="button" id="new-chat-btn" class="new-chat-btn" aria-label="Start new chat">New chat</button>
+
+        <div class="header-right">
+          <div class="model-wrap">
+            <select id="model-select" class="model-select" aria-label="Select model">
+              <option value="">Loading models…</option>
+            </select>
+          </div>
+          <button type="button" id="new-chat-btn" class="new-chat-btn" aria-label="Start new chat">New chat</button>
+        </div>
       </div>
       <p class="subtitle">Powered by Ollama</p>
     </header>
@@ -55,6 +63,17 @@
 
       <div id="status" class="status" aria-live="polite"></div>
     </main>
+  </div>
+
+  <!-- Mobile model picker modal -->
+  <div id="model-modal" class="model-modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="model-modal-title">
+    <div class="model-modal-sheet">
+      <div class="model-modal-header">
+        <h3 id="model-modal-title">Choose model</h3>
+        <button id="model-modal-close" class="model-modal-close" aria-label="Close">✕</button>
+      </div>
+      <div id="model-modal-list" class="model-modal-list" role="list"></div>
+    </div>
   </div>
 
   <script src="/static/app.js?v=2"></script>

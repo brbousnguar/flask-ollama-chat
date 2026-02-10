@@ -8,6 +8,11 @@
   const sendBtn = document.getElementById("send-btn");
   const newChatBtn = document.getElementById("new-chat-btn");
   const modelSelect = document.getElementById("model-select");
+  const modelBadge = document.getElementById("model-badge");
+  const modelModal = document.getElementById("model-modal");
+  const modelModalList = document.getElementById("model-modal-list");
+  const modelModalClose = document.getElementById("model-modal-close");
+  const inputRow = document.querySelector('.input-row');
 
   let conversation = [];
 
@@ -18,19 +23,108 @@
       const data = await res.json();
       const models = data.models || [];
       modelSelect.innerHTML = "";
+      // show selected model name in the badge when available, otherwise show count
+      if (modelSelect && modelSelect.value) {
+        if (modelBadge) modelBadge.textContent = modelSelect.value;
+      } else if (!modelBadge) {
+        // noop
+      } else if (models.length === 0) {
+        modelBadge.textContent = "No models";
+      } else {
+        modelBadge.textContent = models.length + " model" + (models.length > 1 ? "s" : "");
+      }
+
       if (models.length === 0) {
         modelSelect.innerHTML = '<option value="">No models found</option>';
         return;
       }
+
       models.forEach(function (name) {
         const opt = document.createElement("option");
         opt.value = name;
         opt.textContent = name;
         modelSelect.appendChild(opt);
       });
+
+      // choose first model by default if none selected
+      if (!modelSelect.value && models.length) {
+        modelSelect.value = models[0];
+      }
+
+      // populate modal list for mobile picker
+      if (modelModalList) {
+        modelModalList.innerHTML = "";
+        models.forEach(function (name) {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "model-option";
+          btn.setAttribute('data-model-name', name);
+          btn.textContent = name;
+          if (modelSelect && modelSelect.value === name) btn.classList.add('active');
+          btn.addEventListener("click", function () {
+            modelSelect.value = name;
+            updateSelectedModelDisplay(name);
+            closeModelModal();
+          });
+          modelModalList.appendChild(btn);
+        });
+      }
     } catch (err) {
       modelSelect.innerHTML = '<option value="">Failed to load models</option>';
+      if (modelBadge) modelBadge.textContent = "Load failed";
     }
+  }
+
+  function updateSelectedModelDisplay(name) {
+    if (!name) return;
+    // update badge
+    if (modelBadge) {
+      modelBadge.textContent = name;
+      modelBadge.classList.add('active');
+    }
+    // update modal active state
+    if (modelModalList) {
+      const buttons = modelModalList.querySelectorAll('[data-model-name]');
+      buttons.forEach(function (b) {
+        if (b.getAttribute('data-model-name') === name) b.classList.add('active');
+        else b.classList.remove('active');
+      });
+    }
+  }
+
+  // sync when the select changes
+  if (modelSelect) {
+    modelSelect.addEventListener('change', function (e) {
+      const name = e.target.value;
+      updateSelectedModelDisplay(name);
+    });
+  }
+
+  // Ensure messages area has enough bottom padding so the fixed input doesn't overlap
+  function updateMessagesPadding() {
+    try {
+      if (!messagesEl || !inputRow) return;
+      const h = inputRow.getBoundingClientRect().height;
+      messagesEl.style.paddingBottom = Math.max(h + 12, 88) + 'px';
+    } catch (e) {}
+  }
+
+  // Keep messages scrolled to bottom when appropriate
+  function ensureScrolled() {
+    try { messagesEl.scrollTop = messagesEl.scrollHeight; } catch (e) {}
+  }
+
+  function openModelModal() {
+    if (!modelModal) return;
+    modelModal.setAttribute("aria-hidden", "false");
+    // focus first option if exists
+    const first = modelModal.querySelector("button");
+    if (first) first.focus();
+  }
+
+  function closeModelModal() {
+    if (!modelModal) return;
+    modelModal.setAttribute("aria-hidden", "true");
   }
 
   function startNewChat() {
@@ -171,8 +265,21 @@
   });
 
   if (newChatBtn) newChatBtn.addEventListener("click", startNewChat);
+  if (modelBadge) {
+    modelBadge.setAttribute("role", "button");
+    modelBadge.addEventListener("click", openModelModal);
+  }
+  if (modelModalClose) modelModalClose.addEventListener("click", closeModelModal);
+  if (modelModal) modelModal.addEventListener("click", function (e) {
+    if (e.target === modelModal) closeModelModal();
+  });
 
   loadModels();
   if (emptyState) showEmptyState(true);
-  input.focus();
+  // update padding and scroll on load
+  setTimeout(function () { updateMessagesPadding(); ensureScrolled(); try { input.focus(); } catch (e) {} }, 120);
+
+  // adjust on resize/orientation change
+  window.addEventListener('resize', function () { updateMessagesPadding(); ensureScrolled(); });
+  window.addEventListener('orientationchange', function () { setTimeout(function(){ updateMessagesPadding(); ensureScrolled(); }, 120); });
 })();

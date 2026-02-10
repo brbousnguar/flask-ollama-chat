@@ -55,12 +55,17 @@ body::before {
 .app {
   position: relative;
   z-index: 1;
-  max-width: 680px;
+  max-width: 920px;
   margin: 0 auto;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   padding: 1.5rem;
+}
+
+/* Mobile-first tweaks for modern phones (iPhone 17, Galaxy S24) */
+:root {
+  --mobile-gap: 0.75rem;
 }
 
 /* Header */
@@ -72,10 +77,40 @@ body::before {
 .header-row {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   gap: 0.75rem;
   flex-wrap: wrap;
 }
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.model-badge {
+  font-size: 0.9rem;
+  color: var(--text-subtle);
+  background: transparent;
+  padding: 0.25rem 0.5rem;
+  border-radius: 8px;
+}
+
+/* Make the badge look tappable on mobile */
+.model-badge[role="button"] {
+  cursor: pointer;
+  padding: 0.5rem 0.75rem;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.02);
+}
+
+.model-wrap { display: block; }
 
 .header-badge {
   display: inline-flex;
@@ -161,6 +196,11 @@ body::before {
   overflow: hidden;
 }
 
+/* ensure the chat area is sized to viewport and accounts for safe areas */
+.app, .chat-container {
+  min-height: 100dvh;
+}
+
 /* Messages area */
 .messages {
   flex: 1;
@@ -171,6 +211,12 @@ body::before {
   flex-direction: column;
   gap: 1rem;
   scroll-behavior: smooth;
+}
+
+/* Larger message font and spacing on modern phones */
+.message {
+  font-size: 1rem;
+  padding: 1rem 1.25rem;
 }
 
 .messages::-webkit-scrollbar {
@@ -311,6 +357,15 @@ body::before {
   background: var(--bg-soft);
 }
 
+/* Make input bar sticky on mobile and account for safe-area */
+.chat-container .input-row {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  backdrop-filter: blur(6px);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0) + 1rem);
+}
+
 #user-input {
   flex: 1;
   padding: 0.875rem 1.25rem;
@@ -337,8 +392,8 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 56px;
+  height: 56px;
   padding: 0;
   font-family: inherit;
   color: #fff;
@@ -403,11 +458,113 @@ body::before {
   }
 
   .input-row {
-    padding: 0.875rem 1rem;
+    padding: 0.5rem 0.75rem calc(env(safe-area-inset-bottom, 12px) + 12px) 0.75rem;
   }
 
   .send-btn {
-    width: 40px;
-    height: 40px;
+    width: 64px;
+    height: 64px;
+    margin-left: 0.25rem;
   }
+
+  .model-select {
+    width: 100%;
+    min-width: 0;
+    font-size: 0.95rem;
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+  }
+
+  .header-row { gap: 0.5rem; }
+  .header-right { width: 100%; justify-content: flex-end; }
+}
+
+/* Minimal header and fixed input for small phones */
+@media (max-width: 720px) {
+  /* Minimal top: keep only logo + small model-badge */
+  .header { padding: 0.5rem 1rem; }
+  .header .subtitle, .model-wrap, .header .new-chat-btn { display: none !important; }
+  .header-badge { padding: 0.35rem 0.6rem; font-size: 0.95rem; border-radius: 12px; }
+  .model-badge { margin-left: 0.5rem; opacity: 0.95; }
+
+  /* Fix input to bottom so it's always visible */
+  .chat-container { padding-bottom: 0; }
+  .chat-container .input-row {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin: 0;
+    padding: 0.65rem 0.9rem calc(env(safe-area-inset-bottom, 12px) + 12px) 0.9rem;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    background: linear-gradient(180deg, rgba(20,20,26,0.6), rgba(18,18,22,0.85));
+    box-shadow: 0 -14px 30px rgba(0,0,0,0.55);
+    backdrop-filter: blur(8px);
+  }
+
+  /* Ensure messages don't get hidden behind input */
+  .messages {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom, 12px));
+  }
+
+  /* Slightly larger input and send for touch */
+  #user-input { padding: 0.95rem 1.25rem; font-size: 1rem; }
+  .send-btn { width: 68px; height: 68px; }
+}
+
+/* Model modal styles */
+.model-modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0,0,0,0.35);
+  z-index: 60;
+}
+.model-modal[aria-hidden="false"] { display: flex; }
+.model-modal-sheet {
+  width: 100%;
+  max-width: 720px;
+  background: var(--surface);
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  padding: 0.75rem 1rem 1.25rem;
+  box-shadow: 0 -8px 32px rgba(0,0,0,0.5);
+}
+.model-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+.model-modal-close { background: transparent; border: none; color: var(--text); font-size: 1.25rem; }
+.model-modal-list { display: flex; flex-direction: column; gap: 0.5rem; max-height: 60vh; overflow: auto; }
+.model-modal-list button { text-align: left; padding: 0.75rem 1rem; background: var(--surface-elevated); border: 1px solid var(--border); border-radius: 12px; color: var(--text); font-weight: 600; }
+
+/* Active/highlighted model visuals */
+.model-badge.active {
+  background: linear-gradient(90deg, rgba(139,92,246,0.18), rgba(99,102,241,0.12));
+  color: var(--text);
+  box-shadow: 0 6px 18px rgba(139,92,246,0.12);
+  font-weight: 700;
+}
+
+.model-option.active {
+  background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 8px 20px rgba(139,92,246,0.18);
+}
+
+.model-option { transition: transform .12s ease, box-shadow .12s ease; }
+.model-option:active { transform: translateY(1px); }
+
+/* Landscape tweaks for wide phones */
+@media (orientation: landscape) and (max-height: 460px) {
+  .header { display: none; }
+  .chat-container { border-radius: 0; }
+  .model-modal-sheet { max-width: 100%; }
 }
