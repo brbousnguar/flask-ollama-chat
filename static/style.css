@@ -698,6 +698,38 @@ body::before {
   opacity: 0.9;
 }
 
+/* Threads list (left panel on wide, top strip on mobile) */
+.threads {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  align-items: center;
+}
+.thread-item {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.45rem 0.75rem;
+  border-radius: 12px;
+  min-width: 88px;
+  max-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  cursor: pointer;
+}
+.thread-item .thread-title { font-weight: 600; font-size: 0.9rem; }
+.thread-item .thread-preview { font-size: 0.82rem; color: var(--text-subtle); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.thread-item.active { background: linear-gradient(90deg, rgba(139,92,246,0.12), rgba(99,102,241,0.06)); box-shadow: 0 6px 18px rgba(139,92,246,0.08); border-color: transparent; }
+
+@media (min-width: 721px) {
+  /* Move threads to a vertical left rail on wide screens */
+  .chat-container { display: grid; grid-template-columns: 240px 1fr; }
+  .threads { flex-direction: column; padding: 1rem; overflow-y: auto; max-height: calc(100dvh - 160px); }
+  .messages { padding: 1.25rem; }
+}
+
 /* Markdown styles inside messages */
 .message .md-h2 { font-size: 1.05rem; margin: 0.25rem 0; }
 .message .md-h3 { font-size: 1rem; margin: 0.25rem 0; color: var(--text); }

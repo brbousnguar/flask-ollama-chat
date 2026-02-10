@@ -14,8 +14,99 @@
   const modelModalList = document.getElementById("model-modal-list");
   const modelModalClose = document.getElementById("model-modal-close");
   const inputRow = document.querySelector('.input-row');
+  const threadsEl = document.getElementById('threads');
 
+  // Threaded conversations: stored as array of {id,title,messages:[{role,content}],created_at}
+  let threads = [];
+  let currentThreadId = null;
+  // `conversation` is a live reference to the current thread's messages array
   let conversation = [];
+
+  function genId() {
+    return 't_' + Math.random().toString(36).slice(2, 9);
+  }
+
+  function saveThreads() {
+    try { localStorage.setItem('chat_threads', JSON.stringify({ threads: threads, current: currentThreadId })); } catch (e) {}
+  }
+
+  function loadThreads() {
+    try {
+      const raw = localStorage.getItem('chat_threads');
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      threads = parsed.threads || [];
+      currentThreadId = parsed.current || (threads[0] && threads[0].id) || null;
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function renderThreads() {
+    if (!threadsEl) return;
+    threadsEl.innerHTML = '';
+    threads.forEach(t => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'thread-item' + (t.id === currentThreadId ? ' active' : '');
+      btn.setAttribute('data-thread-id', t.id);
+      const title = document.createElement('div');
+      title.className = 'thread-title';
+      title.textContent = t.title || 'Chat';
+      const preview = document.createElement('div');
+      preview.className = 'thread-preview';
+      const last = (t.messages && t.messages.length) ? t.messages[t.messages.length - 1] : null;
+      preview.textContent = last ? (last.content || '').slice(0, 120) : 'Empty';
+      btn.appendChild(title);
+      btn.appendChild(preview);
+      btn.addEventListener('click', function () { selectThread(t.id); });
+      threadsEl.appendChild(btn);
+    });
+  }
+
+  function selectThread(id) {
+    const t = threads.find(x => x.id === id);
+    if (!t) return;
+    currentThreadId = id;
+    conversation = t.messages;
+    renderThreads();
+    renderThreadMessages();
+    saveThreads();
+  }
+
+  function createThread({ title = 'Chat', context = null } = {}) {
+    const id = genId();
+    const msgs = [];
+    if (context) {
+      // include preview as a system message to provide context
+      msgs.push({ role: 'system', content: context });
+    }
+    const t = { id: id, title: title, messages: msgs, created_at: new Date().toISOString() };
+    threads.unshift(t);
+    // select new thread
+    selectThread(id);
+    saveThreads();
+    return t;
+  }
+
+  function renderThreadMessages() {
+    // clear and render current conversation messages
+    while (messagesEl.firstChild) messagesEl.removeChild(messagesEl.firstChild);
+    if (emptyState) messagesEl.appendChild(emptyState);
+    showEmptyState(true);
+    if (!conversation || !conversation.length) return;
+    // render each message
+    conversation.forEach(m => {
+      const div = document.createElement('div');
+      div.className = 'message ' + (m.role === 'assistant' ? 'assistant' : (m.role === 'system' ? 'system' : 'user'));
+      div.setAttribute('role', 'listitem');
+      try {
+        if (m.role === 'assistant') div.innerHTML = renderMessageContent(m.content);
+        else div.textContent = m.content;
+      } catch (e) { div.textContent = m.content; }
+      messagesEl.appendChild(div);
+    });
+    scrollToBottom();
+  }
 
   async function loadModels() {
     if (!modelSelect) return;
@@ -516,6 +607,20 @@
   // Apply saved settings on load
   const saved = loadAccessibility();
   if (saved) applyAccessibility(saved);
+
+  // load threads from storage or create a default one
+  if (!loadThreads() || !threads.length) {
+    createThread({ title: 'Chat 1' });
+  } else {
+    // select loaded or first
+    if (!currentThreadId && threads.length) currentThreadId = threads[0].id;
+    const t = threads.find(x => x.id === currentThreadId) || threads[0];
+    if (t) {
+      conversation = t.messages;
+    }
+  }
+  renderThreads();
+  renderThreadMessages();
 
   loadModels();
   if (emptyState) showEmptyState(true);
