@@ -1,0 +1,58 @@
+{
+  "date": "2026-02-10",
+  "threads": [
+    {
+      "id": "t_qe8u9as",
+      "title": "Chat 1",
+      "created_at": "2026-02-10T08:59:41.332Z",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What is the capital of france"
+        },
+        {
+          "role": "assistant",
+          "content": "The capital of France is Paris."
+        }
+      ]
+    },
+    {
+      "id": "t_wlyhyby",
+      "title": "Chat 2",
+      "created_at": "2026-02-10T08:59:56.325Z",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What is the capital of spain"
+        },
+        {
+          "role": "assistant",
+          "content": "The capital of Spain is Madrid."
+        },
+        {
+          "role": "user",
+          "content": "Tell me more about the country"
+        },
+        {
+          "role": "assistant",
+          "content": "Of course! Spain is a country located in southwestern Europe, and it is known for its rich culture, history, and architecture. Here are some interesting facts about Spain:\n\n1. Language: The official language of Spain is Spanish, which is spoken by over 90% of the population. However, there are also several other languages spoken in Spain, including Catalan, Basque, and Galician.\n2. Geography: Spain is located on the Iberian Peninsula in Europe, and it has a border with Portugal to the west and France to the north. It also includes several islands, such as the Balearic Islands and the Canary Islands.\n3. History: Spain has a long and complex history, with many different cultures and empires having ruled over the region. The Moors, for example, occupied much of Spain for nearly 800 years, leaving a lasting legacy in architecture and cuisine.\n4. Art and Architecture: Spain is home to some of the most famous and influential art and architecture in Europe. The works of El Greco, Velázquez, and Goya are just a few examples of the country's cultural heritage.\n5. Cuisine: Spanish cuisine is known for its rich flavors and bold ingredients, such as paella, tapas, and gazpacho. Wine and olive oil are also staples of the Spanish diet.\n6. Sports: Football (soccer) is the most popular sport in Spain, and Barcelona's Camp Nou is one of the largest stadiums in Europe. Other popular sports in Spain include bullfighting, cycling, and basketball.\n7. Festivals and Celebrations: Spain has many unique and lively festivals throughout the year, such as La Tomatina (a giant tomato fight), San Fermín (the Running of the Bulls), and Las Fallas (a celebration of satirical sculptures).\n8. Beaches: Spain has a long coastline with some of the most beautiful beaches in Europe, such as those found in the Balearic Islands and the Canary Islands.\n9. Mountains: The Pyrenees mountains along the French border offer excellent skiing and hiking opportunities, while the Sierra Nevada mountains in southern Spain have a popular ski resort.\n10. Culture: Spain has a rich cultural heritage, with many museums, galleries, and historical sites to explore. Some of the most famous include the Prado Museum in Madrid, the Guggenheim Museum in Bilbao, and the Alhambra palace in Granada.\n\nThese are just a few examples of the many interesting facts about Spain. Is there anything else you would like to know?"
+        }
+      ]
+    },
+    {
+      "id": "t_y6azghc",
+      "title": "Chat 3",
+      "created_at": "2026-02-10T09:00:05.584Z",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What is the capital of china"
+        },
+        {
+          "role": "assistant",
+          "content": "The capital of China is Beijing."
+        }
+      ]
+    }
+  ]
+}

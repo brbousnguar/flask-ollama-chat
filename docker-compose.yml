@@ -11,3 +11,6 @@ services:
     network_mode: bridge
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      # Persist chat threads to the host so JSON files are stored on your PC
+      - ./data:/app/data

@@ -27,18 +27,38 @@
   }
 
   function saveThreads() {
-    try { localStorage.setItem('chat_threads', JSON.stringify({ threads: threads, current: currentThreadId })); } catch (e) {}
+    // persist only the current thread to server (non-blocking)
+    try {
+      const t = threads.find(x => x.id === currentThreadId);
+      if (!t) return;
+      fetch('/threads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(t),
+      }).catch(() => {});
+    } catch (e) {}
   }
 
   function loadThreads() {
-    try {
-      const raw = localStorage.getItem('chat_threads');
-      if (!raw) return false;
-      const parsed = JSON.parse(raw);
-      threads = parsed.threads || [];
-      currentThreadId = parsed.current || (threads[0] && threads[0].id) || null;
-      return true;
-    } catch (e) { return false; }
+    // load threads from the server, returning a Promise that resolves true/false
+    return fetch('/threads').then(res => res.json()).then(async data => {
+      if (!data || !data.days) return false;
+      const days = data.days;
+      const loaded = [];
+      for (const day of days) {
+        for (const tmeta of (day.threads || [])) {
+          try {
+            const r = await fetch(`/threads/${encodeURIComponent(day.date)}/${encodeURIComponent(tmeta.id)}`);
+            if (!r.ok) continue;
+            const tdata = await r.json();
+            loaded.push(tdata);
+          } catch (e) { continue; }
+        }
+      }
+      threads = loaded;
+      currentThreadId = threads[0] && threads[0].id;
+      return threads.length > 0;
+    }).catch(() => false);
   }
 
   function renderThreads() {
@@ -366,12 +386,29 @@
   }
 
   function startNewChat() {
-    conversation = [];
-    setStatus("");
-    showTyping(false);
-    while (messagesEl.firstChild) messagesEl.removeChild(messagesEl.firstChild);
-    if (emptyState) messagesEl.appendChild(emptyState);
-    showEmptyState(true);
+    // Create a new thread. Ask the user whether they want to include the
+    // last assistant reply as context (since including it silently can be
+    // surprising). Default: create an empty new chat.
+    let preview = null;
+    if (conversation && conversation.length) {
+      for (let i = conversation.length - 1; i >= 0; i--) {
+        if (conversation[i].role === 'assistant' && conversation[i].content) {
+          preview = conversation[i].content;
+          break;
+        }
+      }
+    }
+
+    let includeContext = false;
+    try {
+      if (preview) {
+        includeContext = window.confirm('Include the last assistant reply as context in the new chat?\n\nOK = include, Cancel = start empty');
+      }
+    } catch (e) { includeContext = false; }
+
+    const t = includeContext ? createThread({ title: 'Chat ' + (threads.length + 1), context: preview }) : createThread({ title: 'Chat ' + (threads.length + 1) });
+    // persist newly created thread
+    saveThreads();
     input.focus();
   }
 
@@ -491,8 +528,11 @@
         }
       }
 
-      conversation.push({ role: "assistant", content: fullContent });
-      setStatus("");
+  conversation.push({ role: "assistant", content: fullContent });
+  // update thread preview and persist
+  renderThreads();
+  saveThreads();
+  setStatus("");
     } catch (err) {
       messageEl.remove();
       addMessage("assistant", "Network error: " + err.message, true);
@@ -608,24 +648,29 @@
   const saved = loadAccessibility();
   if (saved) applyAccessibility(saved);
 
-  // load threads from storage or create a default one
-  if (!loadThreads() || !threads.length) {
-    createThread({ title: 'Chat 1' });
-  } else {
-    // select loaded or first
-    if (!currentThreadId && threads.length) currentThreadId = threads[0].id;
-    const t = threads.find(x => x.id === currentThreadId) || threads[0];
-    if (t) {
-      conversation = t.messages;
+  // initialize app: load threads from server (or create a default)
+  async function init() {
+    const ok = await loadThreads();
+    if (!ok || !threads.length) {
+      const t = createThread({ title: 'Chat 1' });
+      // persist immediately
+      saveThreads();
+    } else {
+      // select loaded or first
+      if (!currentThreadId && threads.length) currentThreadId = threads[0].id;
+      const t = threads.find(x => x.id === currentThreadId) || threads[0];
+      if (t) conversation = t.messages;
     }
-  }
-  renderThreads();
-  renderThreadMessages();
+    renderThreads();
+    renderThreadMessages();
 
-  loadModels();
-  if (emptyState) showEmptyState(true);
-  // update padding and scroll on load
-  setTimeout(function () { updateMessagesPadding(); ensureScrolled(); try { input.focus(); } catch (e) {} }, 120);
+    await loadModels();
+    if (emptyState) showEmptyState(true);
+    // update padding and scroll on load
+    setTimeout(function () { updateMessagesPadding(); ensureScrolled(); try { input.focus(); } catch (e) {} }, 120);
+  }
+
+  init();
 
   // adjust on resize/orientation change
   window.addEventListener('resize', function () { updateMessagesPadding(); ensureScrolled(); });
