@@ -7,6 +7,7 @@
   const statusEl = document.getElementById("status");
   const sendBtn = document.getElementById("send-btn");
   const newChatBtn = document.getElementById("new-chat-btn");
+  const newChatBtnBottom = document.getElementById("new-chat-btn-bottom");
   const modelSelect = document.getElementById("model-select");
   const modelBadge = document.getElementById("model-badge");
   const modelModal = document.getElementById("model-modal");
@@ -417,6 +418,7 @@
   });
 
   if (newChatBtn) newChatBtn.addEventListener("click", startNewChat);
+  if (newChatBtnBottom) newChatBtnBottom.addEventListener("click", startNewChat);
   if (modelBadge) {
     modelBadge.setAttribute("role", "button");
     modelBadge.addEventListener("click", openModelModal);

@@ -462,6 +462,30 @@ body::before {
   background: var(--bg-soft);
 }
 
+/* Bottom new chat button (placed in input row) */
+.new-chat-btn-bottom {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  margin-right: 0.35rem;
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 1.15rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.new-chat-btn-bottom:hover { box-shadow: var(--shadow-soft); }
+
+/* On larger screens keep a subtle spacing -- header already has a new-chat button */
+@media (min-width: 721px) {
+  .new-chat-btn-bottom { display: none; }
+}
+
 /* Make input bar sticky on mobile and account for safe-area */
 .chat-container .input-row {
   position: sticky;
