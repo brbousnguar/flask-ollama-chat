@@ -33,8 +33,21 @@ def list_models():
         req = urllib.request.Request(f"{OLLAMA_BASE}/api/tags")
         with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read().decode())
-        names = [m.get("name", "") for m in data.get("models", []) if m.get("name")]
-        return jsonify({"models": names})
+
+        models = []
+        for m in data.get("models", []):
+            name = m.get("name") or m.get("model") or None
+            if not name:
+                continue
+            # include available metadata from Ollama so UI can show modified/updated info
+            models.append({
+                "name": name,
+                "modified_at": m.get("modified_at") or m.get("modified"),
+                "size": m.get("size"),
+                "details": m.get("details", {}),
+            })
+
+        return jsonify({"models": models})
     except Exception as e:
         return jsonify({"error": str(e), "models": []}), 500
 

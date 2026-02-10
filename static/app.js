@@ -23,6 +23,8 @@
       const data = await res.json();
       const models = data.models || [];
       modelSelect.innerHTML = "";
+
+      // models may be array of {name, modified_at, size, details}
       // show selected model name in the badge when available, otherwise show count
       if (modelSelect && modelSelect.value) {
         if (modelBadge) modelBadge.textContent = modelSelect.value;
@@ -31,7 +33,13 @@
       } else if (models.length === 0) {
         modelBadge.textContent = "No models";
       } else {
-        modelBadge.textContent = models.length + " model" + (models.length > 1 ? "s" : "");
+        // if models array contains objects, show first model name; otherwise show count
+        if (typeof models[0] === 'object' && models[0].name) {
+          modelBadge.textContent = models[0].name;
+          modelBadge.classList.add('active');
+        } else {
+          modelBadge.textContent = models.length + " model" + (models.length > 1 ? "s" : "");
+        }
       }
 
       if (models.length === 0) {
@@ -39,27 +47,45 @@
         return;
       }
 
-      models.forEach(function (name) {
+      models.forEach(function (m) {
+        const name = typeof m === 'string' ? m : (m.name || '');
         const opt = document.createElement("option");
         opt.value = name;
         opt.textContent = name;
+        if (m && m.modified_at) opt.setAttribute('data-modified', m.modified_at);
         modelSelect.appendChild(opt);
       });
 
       // choose first model by default if none selected
       if (!modelSelect.value && models.length) {
-        modelSelect.value = models[0];
+        const firstName = typeof models[0] === 'string' ? models[0] : models[0].name;
+        modelSelect.value = firstName;
+        updateSelectedModelDisplay(firstName);
       }
 
       // populate modal list for mobile picker
       if (modelModalList) {
         modelModalList.innerHTML = "";
-        models.forEach(function (name) {
+        models.forEach(function (m) {
+          const name = typeof m === 'string' ? m : (m.name || '');
+          const modified = (m && m.modified_at) ? m.modified_at : null;
           const btn = document.createElement("button");
           btn.type = "button";
           btn.className = "model-option";
           btn.setAttribute('data-model-name', name);
           btn.textContent = name;
+          if (modified) {
+            const meta = document.createElement('div');
+            meta.className = 'model-meta';
+            // show a friendly formatted date if possible
+            try {
+              const d = new Date(modified);
+              meta.textContent = 'updated: ' + d.toLocaleString();
+            } catch (e) {
+              meta.textContent = modified;
+            }
+            btn.appendChild(meta);
+          }
           if (modelSelect && modelSelect.value === name) btn.classList.add('active');
           btn.addEventListener("click", function () {
             modelSelect.value = name;
@@ -112,6 +138,126 @@
   // Keep messages scrolled to bottom when appropriate
   function ensureScrolled() {
     try { messagesEl.scrollTop = messagesEl.scrollHeight; } catch (e) {}
+  }
+
+  // Lightweight markdown-ish renderer: supports headings (###), bold ** **,
+  // italics * *, inline code ``, code blocks ``` ```, lists, and tables (|).
+  // Also tolerates <br> tags in model output by converting them to newlines first.
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function renderMessageContent(raw) {
+    if (!raw) return '';
+    // Convert any explicit <br> tags to newlines so markdown renderer handles them
+    let text = raw.replace(/<br\s*\/?\s*>/gi, '\n');
+
+    // Normalize CRLF
+    text = text.replace(/\r\n/g, '\n');
+
+    // Escape HTML to avoid raw injection, we'll add back allowed tags
+    text = escapeHtml(text);
+
+    // Code blocks ``` ```
+    text = text.replace(/```([\s\S]*?)```/g, function(_, code) {
+      return '<pre class="md-code"><code>' + escapeHtml(code) + '</code></pre>';
+    });
+
+    // Inline code `code`
+    text = text.replace(/`([^`]+?)`/g, function(_, code) {
+      return '<code class="md-inline-code">' + escapeHtml(code) + '</code>';
+    });
+
+    // Headings ###
+    text = text.replace(/^###\s*(.+)$/gm, '<h3 class="md-h3">$1</h3>');
+    text = text.replace(/^##\s*(.+)$/gm, '<h4 class="md-h4">$1</h4>');
+    text = text.replace(/^#\s*(.+)$/gm, '<h2 class="md-h2">$1</h2>');
+
+    // Bold **text**
+    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+    // Italic *text*
+    text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+    // Tables: detect contiguous blocks of lines containing '|' and render as a table.
+    // This is more robust for outputs that lack a separator row or come in streaming chunks.
+    {
+      const linesArr = text.split('\n');
+      const outLines = [];
+      for (let i = 0; i < linesArr.length; i++) {
+        const line = linesArr[i];
+        if (line && line.indexOf('|') !== -1) {
+          // start candidate block
+          let j = i;
+          const block = [];
+          while (j < linesArr.length && linesArr[j] && linesArr[j].indexOf('|') !== -1) {
+            block.push(linesArr[j].trim());
+            j++;
+          }
+
+          if (block.length >= 2) {
+            // determine if second line is a separator (---|:---|---)
+            const sep = block[1].replace(/\s/g, '');
+            const isSeparator = /^[:\-|]+$/.test(sep);
+
+            const headerLine = block[0];
+            const cols = headerLine.split('|').map(s => s.trim()).filter(Boolean);
+
+            const rows = [];
+            const rowStart = isSeparator ? 2 : 1;
+            for (let k = rowStart; k < block.length; k++) {
+              const cells = block[k].split('|').map(s => s.trim()).filter(() => true);
+              // keep empty cells as empty strings but trim surrounding whitespace
+              const cleaned = block[k].split('|').map(s => s.trim());
+              // remove leading/trailing empty due to pipes
+              const filtered = cleaned.filter((_, idx) => !(idx === 0 && cleaned[idx] === '') && !(idx === cleaned.length - 1 && cleaned[idx] === ''));
+              if (filtered.length) rows.push(filtered);
+            }
+
+            // build table HTML
+            let table = '<div class="md-table-wrap"><table class="md-table"><thead><tr>';
+            cols.forEach(c => table += '<th>' + c + '</th>');
+            table += '</tr></thead><tbody>';
+            rows.forEach(r => {
+              table += '<tr>';
+              for (let ci = 0; ci < cols.length; ci++) {
+                const cell = r[ci] !== undefined ? r[ci] : '';
+                table += '<td>' + cell + '</td>';
+              }
+              table += '</tr>';
+            });
+            table += '</tbody></table></div>';
+
+            outLines.push(table);
+            i = j - 1;
+            continue;
+          }
+          // not a table block, fall through and add line as-is
+          outLines.push(line);
+        } else {
+          outLines.push(line);
+        }
+      }
+      text = outLines.join('\n');
+    }
+
+    // Unordered lists: lines starting with - or *
+    text = text.replace(/(^|\n)([ \t]*[-\*] .+(\n[ \t]*[-\*] .+)*)/g, function(_, pre, listBlock) {
+      const items = listBlock.trim().split('\n').map(l => l.replace(/^[-\*]\s?/, ''));
+      return (pre || '') + '<ul class="md-ul">' + items.map(i => '<li>' + i + '</li>').join('') + '</ul>';
+    });
+
+    // Paragraphs: split by two newlines
+    const parts = text.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
+    const html = parts.map(p => {
+      // if already a block element (h2/h3/pre/table/ul) leave as is
+      if (/^<(h2|h3|h4|pre|div|ul|table)/.test(p)) return p;
+      // replace single newlines with <br>
+      const withBreaks = p.replace(/\n/g, '<br>');
+      return '<p>' + withBreaks + '</p>';
+    }).join('\n');
+
+    return html;
   }
 
   function openModelModal() {
@@ -240,7 +386,13 @@
             }
             if (data.content) {
               fullContent += data.content;
-              messageEl.textContent = fullContent;
+              // Render markdown/HTML-like content safely
+              try {
+                messageEl.innerHTML = renderMessageContent(fullContent);
+              } catch (e) {
+                // fallback to plain text
+                messageEl.textContent = fullContent;
+              }
               scrollToBottom();
             }
           } catch (_) {}

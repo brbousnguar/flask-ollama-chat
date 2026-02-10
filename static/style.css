@@ -562,6 +562,28 @@ body::before {
 .model-option { transition: transform .12s ease, box-shadow .12s ease; }
 .model-option:active { transform: translateY(1px); }
 
+.model-meta {
+  font-size: 0.8rem;
+  color: var(--text-subtle);
+  margin-top: 6px;
+  opacity: 0.9;
+}
+
+/* Markdown styles inside messages */
+.message .md-h2 { font-size: 1.05rem; margin: 0.25rem 0; }
+.message .md-h3 { font-size: 1rem; margin: 0.25rem 0; color: var(--text); }
+.message .md-h4 { font-size: 0.95rem; margin: 0.25rem 0; color: var(--text-subtle); }
+.message p { margin: 0.45rem 0; color: var(--text); }
+.message .md-inline-code { background: rgba(255,255,255,0.04); padding: 0.12rem 0.28rem; border-radius: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', 'Courier New', monospace; font-size: 0.88rem; }
+.message .md-code { background: #0b0b0e; padding: 0.75rem; border-radius: 10px; overflow: auto; color: #e6e6e9; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', monospace; font-size: 0.9rem; }
+.message .md-ul { padding-left: 1rem; margin: 0.3rem 0; }
+.message .md-ul li { margin: 0.25rem 0; }
+.md-table-wrap { overflow:auto; margin: 0.5rem 0; }
+.md-table { border-collapse: collapse; width: 100%; min-width: 420px; }
+.md-table th, .md-table td { border: 1px solid rgba(255,255,255,0.04); padding: 0.5rem 0.75rem; text-align: left; }
+.md-table th { background: rgba(255,255,255,0.03); font-weight: 700; }
+.message .md-meta { color: var(--text-subtle); font-size: 0.82rem; }
+
 /* Landscape tweaks for wide phones */
 @media (orientation: landscape) and (max-height: 460px) {
   .header { display: none; }
