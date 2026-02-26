@@ -888,3 +888,128 @@ body::before {
   cursor: pointer;
   font-weight: 600;
 }
+
+/* Desktop UX polish */
+@media (min-width: 900px) {
+  .app {
+    width: min(98vw, 1680px);
+    max-width: 1680px;
+    padding: 1rem 1.25rem 1.25rem;
+    gap: 0.75rem;
+  }
+
+  .header {
+    margin-bottom: 0.25rem;
+    text-align: left;
+  }
+
+  .header-row {
+    align-items: center;
+    justify-content: space-between;
+    background: color-mix(in srgb, var(--surface) 88%, white 12%);
+    border: 1px solid var(--border-soft);
+    border-radius: 14px;
+    padding: 0.6rem 0.75rem;
+  }
+
+  .subtitle {
+    margin: 0.45rem 0 0 0.2rem;
+  }
+
+  .chat-container {
+    display: grid;
+    grid-template-columns: 250px minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "threads typing"
+      "threads messages"
+      "threads input"
+      "threads status";
+    min-height: 680px;
+    height: calc(100vh - 150px);
+    border-radius: 16px;
+  }
+
+  .chat-container .threads {
+    grid-area: threads;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.55rem;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: var(--surface-elevated);
+    border-right: 1px solid var(--border-soft);
+    padding: 0.9rem 0.8rem;
+  }
+
+  .thread-item {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+    padding: 0.65rem 0.72rem;
+    border-radius: 12px;
+    text-align: left;
+  }
+
+  .thread-item .thread-title {
+    font-size: 0.9rem;
+  }
+
+  .thread-item .thread-preview {
+    white-space: normal;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.3;
+  }
+
+  .chat-container .typing-indicator {
+    grid-area: typing;
+    margin: 0.85rem 1.2rem 0;
+  }
+
+  .chat-container .messages {
+    grid-area: messages;
+    min-height: 0;
+    padding: 1rem 1.25rem 0.75rem;
+  }
+
+  .message {
+    max-width: 82%;
+  }
+
+  .chat-container .input-row {
+    grid-area: input;
+    position: static;
+    margin: 0.55rem 1.1rem 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--surface-elevated) 92%, white 8%);
+    padding: 0.45rem;
+    box-shadow: var(--shadow-soft);
+  }
+
+  #user-input {
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    padding: 0.9rem 1rem;
+  }
+
+  #user-input:focus {
+    border: none;
+    box-shadow: none;
+  }
+
+  .send-btn {
+    width: 48px;
+    height: 48px;
+  }
+
+  .chat-container .status {
+    grid-area: status;
+    padding: 0 1.3rem 0.8rem;
+  }
+}
