@@ -15,15 +15,68 @@
   const modelModalClose = document.getElementById("model-modal-close");
   const inputRow = document.querySelector('.input-row');
   const threadsEl = document.getElementById('threads');
+  const authModal = document.getElementById('auth-modal');
+  const authError = document.getElementById('auth-error');
+  const registerForm = document.getElementById('register-form');
+  const loginForm = document.getElementById('login-form');
+  const userBox = document.getElementById('user-box');
+  const userName = document.getElementById('user-name');
+  const logoutBtn = document.getElementById('logout-btn');
 
   // Threaded conversations: stored as array of {id,title,messages:[{role,content}],created_at}
   let threads = [];
   let currentThreadId = null;
   // `conversation` is a live reference to the current thread's messages array
   let conversation = [];
+  let currentUser = null;
 
   function genId() {
     return 't_' + Math.random().toString(36).slice(2, 9);
+  }
+
+  function setAuthError(message) {
+    if (!authError) return;
+    if (!message) {
+      authError.hidden = true;
+      authError.textContent = '';
+      return;
+    }
+    authError.hidden = false;
+    authError.textContent = message;
+  }
+
+  function toggleAuthModal(show) {
+    if (!authModal) return;
+    authModal.setAttribute('aria-hidden', show ? 'false' : 'true');
+  }
+
+  function updateUserUi() {
+    if (!userBox || !userName) return;
+    if (!currentUser) {
+      userBox.hidden = true;
+      userName.textContent = '';
+      return;
+    }
+    userName.textContent = currentUser.name;
+    userBox.hidden = false;
+  }
+
+  async function getCurrentUser() {
+    try {
+      const res = await fetch('/auth/me');
+      const data = await res.json();
+      if (data && data.authenticated && data.user) {
+        currentUser = data.user;
+        updateUserUi();
+        toggleAuthModal(false);
+        setAuthError('');
+        return true;
+      }
+    } catch (e) {}
+    currentUser = null;
+    updateUserUi();
+    toggleAuthModal(true);
+    return false;
   }
 
   function saveThreads() {
@@ -35,13 +88,25 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(t),
+      }).then(function (res) {
+        if (res.status === 401) {
+          currentUser = null;
+          updateUserUi();
+          toggleAuthModal(true);
+        }
       }).catch(() => {});
     } catch (e) {}
   }
 
-  function loadThreads() {
+  async function loadThreads() {
     // load threads from the server, returning a Promise that resolves true/false
-    return fetch('/threads').then(res => res.json()).then(async data => {
+    return fetch('/threads').then(async res => {
+      if (res.status === 401) {
+        toggleAuthModal(true);
+        return false;
+      }
+      return res.json();
+    }).then(async data => {
       if (!data || !data.days) return false;
       const days = data.days;
       const loaded = [];
@@ -132,6 +197,12 @@
     if (!modelSelect) return;
     try {
       const res = await fetch("/models");
+      if (res.status === 401) {
+        currentUser = null;
+        updateUserUi();
+        toggleAuthModal(true);
+        return;
+      }
       const data = await res.json();
       const models = data.models || [];
       modelSelect.innerHTML = "";
@@ -484,6 +555,11 @@
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
+        if (res.status === 401) {
+          currentUser = null;
+          updateUserUi();
+          toggleAuthModal(true);
+        }
         messageEl.remove();
         addMessage("assistant", err.error || "Request failed", true);
         setStatus("", "error");
@@ -558,6 +634,19 @@
   if (modelModal) modelModal.addEventListener("click", function (e) {
     if (e.target === modelModal) closeModelModal();
   });
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async function () {
+      await fetch('/auth/logout', { method: 'POST' }).catch(() => {});
+      threads = [];
+      currentThreadId = null;
+      conversation = [];
+      currentUser = null;
+      updateUserUi();
+      renderThreads();
+      renderThreadMessages();
+      toggleAuthModal(true);
+    });
+  }
 
   // Accessibility panel logic
   const accessBtn = document.getElementById('access-btn');
@@ -649,10 +738,10 @@
   if (saved) applyAccessibility(saved);
 
   // initialize app: load threads from server (or create a default)
-  async function init() {
+  async function initApp() {
     const ok = await loadThreads();
     if (!ok || !threads.length) {
-      const t = createThread({ title: 'Chat 1' });
+      createThread({ title: 'Chat 1' });
       // persist immediately
       saveThreads();
     } else {
@@ -670,6 +759,73 @@
     setTimeout(function () { updateMessagesPadding(); ensureScrolled(); try { input.focus(); } catch (e) {} }, 120);
   }
 
+  async function init() {
+    const authenticated = await getCurrentUser();
+    if (!authenticated) return;
+    await initApp();
+  }
+
+  if (registerForm) {
+    registerForm.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      setAuthError('');
+      const name = document.getElementById('register-name').value.trim();
+      const email = document.getElementById('register-email').value.trim();
+      const password = document.getElementById('register-password').value;
+      try {
+        const res = await fetch('/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setAuthError(data.error || 'Unable to create account');
+          return;
+        }
+        currentUser = data.user || null;
+        updateUserUi();
+        toggleAuthModal(false);
+        threads = [];
+        currentThreadId = null;
+        conversation = [];
+        await initApp();
+      } catch (err) {
+        setAuthError('Network error while creating account');
+      }
+    });
+  }
+
+  if (loginForm) {
+    loginForm.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      setAuthError('');
+      const email = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+      try {
+        const res = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setAuthError(data.error || 'Unable to sign in');
+          return;
+        }
+        currentUser = data.user || null;
+        updateUserUi();
+        toggleAuthModal(false);
+        threads = [];
+        currentThreadId = null;
+        conversation = [];
+        await initApp();
+      } catch (err) {
+        setAuthError('Network error while signing in');
+      }
+    });
+  }
+
   init();
 
   // Register the service worker for PWA installability and offline caching
@@ -677,11 +833,19 @@
     navigator.serviceWorker.register('/service-worker.js')
       .then(reg => {
         console.log('Service worker registered', reg.scope);
+        reg.update().catch(() => {});
         if (reg.waiting) console.log('Service worker waiting');
         if (reg.active) console.log('Service worker active');
       }).catch(err => {
         console.warn('Service worker registration failed:', err);
       });
+
+    let reloadedByController = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (reloadedByController) return;
+      reloadedByController = true;
+      window.location.reload();
+    });
   }
 
   // PWA install flow: capture the beforeinstallprompt event and show our own button

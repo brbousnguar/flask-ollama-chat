@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/style.css?v=2">
+  <link rel="stylesheet" href="/static/style.css?v=4">
 </head>
 <body>
   <div class="app">
@@ -24,6 +24,10 @@
         </div>
 
         <div class="header-right">
+          <div id="user-box" class="user-box" hidden>
+            <span id="user-name" class="user-name"></span>
+            <button type="button" id="logout-btn" class="logout-btn" aria-label="Logout">Logout</button>
+          </div>
           <div class="model-wrap">
             <select id="model-select" class="model-select" aria-label="Select model">
               <option value="">Loading models…</option>
@@ -124,6 +128,29 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=2"></script>
+  <div id="auth-modal" class="auth-modal" aria-hidden="true">
+    <div class="auth-card">
+      <h2>Welcome</h2>
+      <p class="auth-subtitle">Create an account or sign in to access your own chat sessions.</p>
+      <p id="auth-error" class="auth-error" hidden></p>
+
+      <form id="register-form" class="auth-form">
+        <h3>Create account</h3>
+        <input id="register-name" type="text" placeholder="Name" autocomplete="name" required>
+        <input id="register-email" type="email" placeholder="Email" autocomplete="email" required>
+        <input id="register-password" type="password" placeholder="Password (min 8 chars)" autocomplete="new-password" minlength="8" required>
+        <button type="submit">Create account</button>
+      </form>
+
+      <form id="login-form" class="auth-form">
+        <h3>Sign in</h3>
+        <input id="login-email" type="email" placeholder="Email" autocomplete="email" required>
+        <input id="login-password" type="password" placeholder="Password" autocomplete="current-password" required>
+        <button type="submit">Sign in</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/static/app.js?v=4"></script>
 </body>
 </html>

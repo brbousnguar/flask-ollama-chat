@@ -5,6 +5,8 @@ A lightweight Flask web app that provides a chat UI backed by a local Ollama ser
 ## Features
 - Streaming chat responses (SSE).
 - Model discovery from Ollama.
+- Account creation and login (name, email, password).
+- Session-aware thread history (each user only sees their own chats).
 - Persistent chat threads stored as JSON.
 - Simple single-page UI with PWA assets.
 
@@ -32,7 +34,9 @@ Environment variables (all optional):
 - `OLLAMA_BASE_URL` (default `http://localhost:11434`)
 - `OLLAMA_MODEL` (default `gpt-oss:latest`)
 - `OLLAMA_API_KEY` (default `ollama`)
+- `FLASK_SECRET_KEY` (recommended in production; secures login sessions)
 
 ## Data Storage
 Chat threads are stored under `data/` as `YYYY-MM-DD.json`.
+Users are stored in `data/app.db` (SQLite).
 With Docker Compose, `./data` is mounted into the container.

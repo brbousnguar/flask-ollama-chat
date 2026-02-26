@@ -3,12 +3,26 @@ Flask AI assistant using local Ollama.
 """
 import json
 import os
+import sqlite3
 import urllib.request
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, Response, stream_with_context, send_from_directory
+from functools import wraps
+
+from flask import (
+    Flask,
+    Response,
+    jsonify,
+    render_template,
+    request,
+    send_from_directory,
+    session,
+    stream_with_context,
+)
 from openai import OpenAI
+from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__, static_folder="static")
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "change-me-in-production")
 
 OLLAMA_BASE = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 
@@ -20,9 +34,51 @@ client = OpenAI(
 
 DEFAULT_MODEL = os.environ.get("OLLAMA_MODEL", "gpt-oss:latest")
 
-# Directory for storing chat threads: data/YYYY-MM-DD/<thread-id>.json
+# Directory for storing chat threads: data/YYYY-MM-DD.json
 DATA_ROOT = os.path.join(os.path.dirname(__file__), "data")
 os.makedirs(DATA_ROOT, exist_ok=True)
+
+DB_PATH = os.path.join(DATA_ROOT, "app.db")
+
+
+def _db_conn():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _init_db():
+    with _db_conn() as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+
+
+_init_db()
+
+
+def _current_user_id():
+    return session.get("user_id")
+
+
+def _auth_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        user_id = _current_user_id()
+        if not user_id:
+            return jsonify({"error": "Authentication required"}), 401
+        return fn(*args, **kwargs)
+
+    return wrapper
+
 
 def _safe_date_str(dt_iso=None):
     try:
@@ -31,6 +87,7 @@ def _safe_date_str(dt_iso=None):
         return dt_iso[:10]
     except Exception:
         return datetime.utcnow().strftime("%Y-%m-%d")
+
 
 def _day_file_path(date_str):
     # single JSON file per day
@@ -41,42 +98,48 @@ def _day_file_path(date_str):
 def _read_day_file(date_str):
     path = _day_file_path(date_str)
     if not os.path.exists(path):
-        return { 'date': date_str, 'threads': [] }
+        return {"date": date_str, "threads": []}
     try:
-        with open(path, 'r', encoding='utf-8') as fh:
-            return json.load(fh) or { 'date': date_str, 'threads': [] }
+        with open(path, "r", encoding="utf-8") as fh:
+            return json.load(fh) or {"date": date_str, "threads": []}
     except Exception:
-        return { 'date': date_str, 'threads': [] }
+        return {"date": date_str, "threads": []}
 
 
 def _write_day_file(date_str, payload):
     path = _day_file_path(date_str)
-    with open(path, 'w', encoding='utf-8') as fh:
+    with open(path, "w", encoding="utf-8") as fh:
         json.dump(payload, fh, ensure_ascii=False, indent=2)
 
 
-def _list_threads():
+def _list_threads(user_id):
     days = []
+    user_id = str(user_id)
     for fn in sorted(os.listdir(DATA_ROOT), reverse=True):
-        if not fn.endswith('.json'):
+        if not fn.endswith(".json"):
             continue
-        date_str = fn.replace('.json', '')
+        date_str = fn.replace(".json", "")
         try:
             data = _read_day_file(date_str)
             items = []
-            for t in data.get('threads', []):
-                preview = ''
-                msgs = t.get('messages') or []
+            for t in data.get("threads", []):
+                if str(t.get("user_id")) != user_id:
+                    continue
+                preview = ""
+                msgs = t.get("messages") or []
                 if msgs:
                     last = msgs[-1]
-                    preview = (last.get('content') if isinstance(last, dict) else str(last)) or ''
-                items.append({
-                    'id': t.get('id'),
-                    'title': t.get('title') or 'Chat',
-                    'created_at': t.get('created_at'),
-                    'preview': preview[:240]
-                })
-            days.append({ 'date': date_str, 'threads': items })
+                    preview = (last.get("content") if isinstance(last, dict) else str(last)) or ""
+                items.append(
+                    {
+                        "id": t.get("id"),
+                        "title": t.get("title") or "Chat",
+                        "created_at": t.get("created_at"),
+                        "preview": preview[:240],
+                    }
+                )
+            if items:
+                days.append({"date": date_str, "threads": items})
         except Exception:
             continue
     return days
@@ -88,7 +151,99 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/auth/me", methods=["GET"])
+def auth_me():
+    user_id = _current_user_id()
+    if not user_id:
+        return jsonify({"authenticated": False, "user": None})
+
+    with _db_conn() as conn:
+        user = conn.execute(
+            "SELECT id, name, email, created_at FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+
+    if not user:
+        session.clear()
+        return jsonify({"authenticated": False, "user": None})
+
+    return jsonify(
+        {
+            "authenticated": True,
+            "user": {
+                "id": user["id"],
+                "name": user["name"],
+                "email": user["email"],
+                "created_at": user["created_at"],
+            },
+        }
+    )
+
+
+@app.route("/auth/register", methods=["POST"])
+def register():
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+
+    if not name:
+        return jsonify({"error": "Name is required"}), 400
+    if not email or "@" not in email:
+        return jsonify({"error": "A valid email is required"}), 400
+    if len(password) < 8:
+        return jsonify({"error": "Password must be at least 8 characters"}), 400
+
+    try:
+        with _db_conn() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO users (name, email, password_hash, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (name, email, generate_password_hash(password), datetime.utcnow().isoformat()),
+            )
+            user_id = cur.lastrowid
+    except sqlite3.IntegrityError:
+        return jsonify({"error": "Email already exists"}), 409
+
+    session["user_id"] = user_id
+    return jsonify({"ok": True, "user": {"id": user_id, "name": name, "email": email}})
+
+
+@app.route("/auth/login", methods=["POST"])
+def login():
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+
+    if not email or not password:
+        return jsonify({"error": "Email and password are required"}), 400
+
+    with _db_conn() as conn:
+        user = conn.execute(
+            "SELECT id, name, email, password_hash FROM users WHERE email = ?", (email,)
+        ).fetchone()
+
+    if not user or not check_password_hash(user["password_hash"], password):
+        return jsonify({"error": "Invalid email or password"}), 401
+
+    session["user_id"] = user["id"]
+    return jsonify(
+        {
+            "ok": True,
+            "user": {"id": user["id"], "name": user["name"], "email": user["email"]},
+        }
+    )
+
+
+@app.route("/auth/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return jsonify({"ok": True})
+
+
 @app.route("/models", methods=["GET"])
+@_auth_required
 def list_models():
     """Return list of available Ollama models (from ollama list)."""
     try:
@@ -101,13 +256,14 @@ def list_models():
             name = m.get("name") or m.get("model") or None
             if not name:
                 continue
-            # include available metadata from Ollama so UI can show modified/updated info
-            models.append({
-                "name": name,
-                "modified_at": m.get("modified_at") or m.get("modified"),
-                "size": m.get("size"),
-                "details": m.get("details", {}),
-            })
+            models.append(
+                {
+                    "name": name,
+                    "modified_at": m.get("modified_at") or m.get("modified"),
+                    "size": m.get("size"),
+                    "details": m.get("details", {}),
+                }
+            )
 
         return jsonify({"models": models})
     except Exception as e:
@@ -132,6 +288,7 @@ def _stream_chat(messages, model):
 
 
 @app.route("/chat", methods=["POST"])
+@_auth_required
 def chat():
     """Backend chat endpoint: streams assistant reply from Ollama as Server-Sent Events."""
     data = request.get_json()
@@ -155,72 +312,83 @@ def chat():
     )
 
 
-@app.route('/threads', methods=['GET'])
+@app.route("/threads", methods=["GET"])
+@_auth_required
 def list_threads_endpoint():
-    """Return a list of saved threads organized by date."""
+    """Return a list of saved threads organized by date for the current user."""
     try:
-        days = _list_threads()
-        return jsonify({ 'days': days })
+        days = _list_threads(_current_user_id())
+        return jsonify({"days": days})
     except Exception as e:
-        return jsonify({'error': str(e), 'days': []}), 500
+        return jsonify({"error": str(e), "days": []}), 500
 
 
-@app.route('/service-worker.js')
+@app.route("/service-worker.js")
 def service_worker_root():
     # Serve the service worker at the site root so its scope can be '/'
-    return send_from_directory(app.static_folder, 'service-worker.js')
+    return send_from_directory(app.static_folder, "service-worker.js")
 
 
-@app.route('/threads/<date>/<thread_id>', methods=['GET'])
+@app.route("/threads/<date>/<thread_id>", methods=["GET"])
+@_auth_required
 def get_thread(date, thread_id):
     try:
+        user_id = str(_current_user_id())
         day = _read_day_file(date)
-        for t in day.get('threads', []):
-            if t.get('id') == thread_id:
+        for t in day.get("threads", []):
+            if t.get("id") == thread_id and str(t.get("user_id")) == user_id:
                 return jsonify(t)
-        return jsonify({'error': 'Not found'}), 404
+        return jsonify({"error": "Not found"}), 404
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
-@app.route('/threads', methods=['POST'])
+@app.route("/threads", methods=["POST"])
+@_auth_required
 def save_thread():
-    """Save or update a thread. Body must be a JSON object with id, title, messages, created_at(optional).
-    The file will be stored under data/YYYY-MM-DD/<id>.json
-    """
+    """Save or update a thread for the current user."""
     try:
         data = request.get_json()
-        if not data or 'id' not in data:
-            return jsonify({'error': "Missing 'id' in body"}), 400
-        tid = data['id']
-        created_at = data.get('created_at') or datetime.utcnow().isoformat()
+        if not data or "id" not in data:
+            return jsonify({"error": "Missing 'id' in body"}), 400
+
+        user_id = _current_user_id()
+        tid = data["id"]
+        created_at = data.get("created_at") or datetime.utcnow().isoformat()
         date_str = _safe_date_str(created_at)
-        # read the day file and upsert the thread
+
         day = _read_day_file(date_str)
-        threads = day.get('threads', [])
+        threads = day.get("threads", [])
         updated = False
+
         for i, t in enumerate(threads):
-            if t.get('id') == tid:
+            if t.get("id") == tid and str(t.get("user_id")) == str(user_id):
                 threads[i] = {
-                    'id': tid,
-                    'title': data.get('title') or t.get('title') or 'Chat',
-                    'created_at': created_at,
-                    'messages': data.get('messages') or []
+                    "id": tid,
+                    "user_id": user_id,
+                    "title": data.get("title") or t.get("title") or "Chat",
+                    "created_at": created_at,
+                    "messages": data.get("messages") or [],
                 }
                 updated = True
                 break
+
         if not updated:
-            threads.append({
-                'id': tid,
-                'title': data.get('title') or 'Chat',
-                'created_at': created_at,
-                'messages': data.get('messages') or []
-            })
-        day['threads'] = threads
+            threads.append(
+                {
+                    "id": tid,
+                    "user_id": user_id,
+                    "title": data.get("title") or "Chat",
+                    "created_at": created_at,
+                    "messages": data.get("messages") or [],
+                }
+            )
+
+        day["threads"] = threads
         _write_day_file(date_str, day)
-        return jsonify({'ok': True, 'date': date_str, 'id': tid})
+        return jsonify({"ok": True, "date": date_str, "id": tid})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
