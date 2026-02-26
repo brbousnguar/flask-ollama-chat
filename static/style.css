@@ -271,6 +271,19 @@ body::before {
   transition: color var(--transition), border-color var(--transition), background var(--transition);
 }
 
+/* Inline install button */
+.install-btn {
+  padding: 0.35rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-elevated);
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 0.25rem;
+}
+.install-btn.show { background: var(--accent); color: #fff; border-color: transparent; box-shadow: 0 6px 18px rgba(139,92,246,0.12); }
+
 .header .new-chat-btn:hover {
   color: var(--text);
   border-color: var(--text-subtle);

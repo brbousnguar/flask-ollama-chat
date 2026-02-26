@@ -165,6 +165,12 @@ def list_threads_endpoint():
         return jsonify({'error': str(e), 'days': []}), 500
 
 
+@app.route('/service-worker.js')
+def service_worker_root():
+    # Serve the service worker at the site root so its scope can be '/'
+    return send_from_directory(app.static_folder, 'service-worker.js')
+
+
 @app.route('/threads/<date>/<thread_id>', methods=['GET'])
 def get_thread(date, thread_id):
     try:

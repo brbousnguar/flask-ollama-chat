@@ -672,6 +672,63 @@
 
   init();
 
+  // Register the service worker for PWA installability and offline caching
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/service-worker.js')
+      .then(reg => {
+        console.log('Service worker registered', reg.scope);
+        if (reg.waiting) console.log('Service worker waiting');
+        if (reg.active) console.log('Service worker active');
+      }).catch(err => {
+        console.warn('Service worker registration failed:', err);
+      });
+  }
+
+  // PWA install flow: capture the beforeinstallprompt event and show our own button
+  let deferredPrompt = null;
+  const installBtn = document.getElementById('install-btn');
+  window.addEventListener('beforeinstallprompt', (e) => {
+    console.log('beforeinstallprompt fired');
+    // Prevent the mini-infobar from appearing on mobile
+    e.preventDefault();
+    deferredPrompt = e;
+    if (installBtn) {
+      installBtn.hidden = false;
+      installBtn.classList.add('show');
+    }
+    return false;
+  });
+
+  // Fallback: check whether app is already installable via crossorigin manifest check
+  (async function checkInstallable() {
+    try {
+      const resp = await fetch('/static/manifest.json');
+      if (!resp.ok) return;
+      const manifest = await resp.json();
+      console.log('manifest loaded', manifest.name || manifest.short_name);
+    } catch (e) { console.warn('manifest fetch failed', e); }
+  })();
+
+  if (installBtn) {
+    installBtn.addEventListener('click', async function () {
+      if (!deferredPrompt) {
+        // If we don't have the event, let user know to use browser menu
+        alert('Install not available: try using the browser menu (Add to Home screen) or ensure the page is served over HTTPS and the site is installable.');
+        return;
+      }
+      installBtn.disabled = true;
+      deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      console.log('User choice', choice);
+      if (choice && choice.outcome === 'accepted') {
+        installBtn.hidden = true;
+      } else {
+        installBtn.disabled = false;
+      }
+      deferredPrompt = null;
+    });
+  }
+
   // adjust on resize/orientation change
   window.addEventListener('resize', function () { updateMessagesPadding(); ensureScrolled(); });
   window.addEventListener('orientationchange', function () { setTimeout(function(){ updateMessagesPadding(); ensureScrolled(); }, 120); });
