@@ -49,3 +49,6 @@ venv.bak/
 # Environment variables
 .env.local
 .env.*.local
+
+# Persisted chat threads (stored on host) — do not commit
+data/
