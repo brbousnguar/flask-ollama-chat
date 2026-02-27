@@ -5,7 +5,7 @@
 - `templates/`: HTML templates (entrypoint `templates/index.html`).
 - `static/`: Frontend assets (`static/app.js`, `static/style.css`, icons, PWA files).
 - `data/`: Persisted chat threads as JSON (`data/YYYY-MM-DD.json`).
-- `Dockerfile`, `docker-compose.yml`: Containerized runtime and local orchestration.
+- `Dockerfile`: Containerized runtime definition.
 - `requirements.txt`: Python dependencies.
 
 ## Build, Test, and Development Commands
@@ -13,7 +13,7 @@
 - `pip install -r requirements.txt`: Install Python dependencies.
 - `python app.py`: Run the Flask app locally (default `http://localhost:5000`).
 - `docker build -t ai-chat-assistant .`: Build the container image.
-- `docker compose up --build`: Run the app via Docker Compose (maps `5001 -> 5000`).
+- `docker run --rm -p 5001:5000 -v "$(pwd)/data:/app/data" ai-chat-assistant`: Run the app with Docker.
 
 ## Coding Style & Naming Conventions
 - Python: 4-space indentation, keep functions small and focused.
@@ -36,4 +36,4 @@
   - `OLLAMA_BASE_URL` (default `http://localhost:11434`)
   - `OLLAMA_MODEL` (default `gpt-oss:latest`)
   - `OLLAMA_API_KEY` (default `ollama`)
-- Thread data persists in `data/`; Docker Compose mounts this for durability.
+- Thread data persists in `data/`; mount it to `/app/data` with Docker for durability.

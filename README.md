@@ -25,7 +25,12 @@ Open `http://localhost:5000`.
 
 ## Setup (Docker)
 ```bash
-docker compose up --build
+docker build -t ai-chat-assistant .
+docker run --rm -p 5001:5000 \
+  -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
+  -e OLLAMA_MODEL=gpt-oss:latest \
+  -v "$(pwd)/data:/app/data" \
+  ai-chat-assistant
 ```
 Open `http://localhost:5001`.
 
@@ -39,4 +44,4 @@ Environment variables (all optional):
 ## Data Storage
 Chat threads are stored under `data/` as `YYYY-MM-DD.json`.
 Users are stored in `data/app.db` (SQLite).
-With Docker Compose, `./data` is mounted into the container.
+With Docker, mount `./data` into the container to persist history and users.
