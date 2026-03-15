@@ -42,9 +42,6 @@
     </header>
 
     <main class="chat-container">
-      <aside id="threads" class="threads" aria-label="Chat threads">
-        <!-- Thread items injected here -->
-      </aside>
       <div id="messages" class="messages" role="log" aria-live="polite">
         <div id="empty-state" class="empty-state">
           <div class="empty-state-icon" aria-hidden="true">✧</div>
@@ -60,7 +57,6 @@
       </div>
 
       <form id="chat-form" class="input-row" aria-label="Send a message">
-        <button type="button" id="new-chat-btn-bottom" class="new-chat-btn-bottom" aria-label="Start new chat">✚</button>
         <input
           id="user-input"
           type="text"

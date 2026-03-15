@@ -7,14 +7,12 @@
   const statusEl = document.getElementById("status");
   const sendBtn = document.getElementById("send-btn");
   const newChatBtn = document.getElementById("new-chat-btn");
-  const newChatBtnBottom = document.getElementById("new-chat-btn-bottom");
   const modelSelect = document.getElementById("model-select");
   const modelBadge = document.getElementById("model-badge");
   const modelModal = document.getElementById("model-modal");
   const modelModalList = document.getElementById("model-modal-list");
   const modelModalClose = document.getElementById("model-modal-close");
   const inputRow = document.querySelector('.input-row');
-  const threadsEl = document.getElementById('threads');
   const authModal = document.getElementById('auth-modal');
   const authError = document.getElementById('auth-error');
   const registerForm = document.getElementById('register-form');
@@ -23,24 +21,19 @@
   const userName = document.getElementById('user-name');
   const logoutBtn = document.getElementById('logout-btn');
 
-  // Threaded conversations: stored as array of {id,title,messages:[{role,content}],created_at}
-  let threads = [];
-  let currentThreadId = null;
-  // `conversation` is a live reference to the current thread's messages array
   let conversation = [];
+  let currentThreadId = null;
   let currentUser = null;
 
   function genId() {
     return 't_' + Math.random().toString(36).slice(2, 9);
   }
 
+  // ── Auth ─────────────────────────────────────────────────────────────────
+
   function setAuthError(message) {
     if (!authError) return;
-    if (!message) {
-      authError.hidden = true;
-      authError.textContent = '';
-      return;
-    }
+    if (!message) { authError.hidden = true; authError.textContent = ''; return; }
     authError.hidden = false;
     authError.textContent = message;
   }
@@ -52,11 +45,7 @@
 
   function updateUserUi() {
     if (!userBox || !userName) return;
-    if (!currentUser) {
-      userBox.hidden = true;
-      userName.textContent = '';
-      return;
-    }
+    if (!currentUser) { userBox.hidden = true; userName.textContent = ''; return; }
     userName.textContent = currentUser.name;
     userBox.hidden = false;
   }
@@ -79,110 +68,60 @@
     return false;
   }
 
-  function saveThreads() {
-    // persist only the current thread to server (non-blocking)
-    try {
-      const t = threads.find(x => x.id === currentThreadId);
-      if (!t) return;
-      fetch('/threads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(t),
-      }).then(function (res) {
-        if (res.status === 401) {
-          currentUser = null;
-          updateUserUi();
-          toggleAuthModal(true);
-        }
-      }).catch(() => {});
-    } catch (e) {}
+  // ── Thread persistence (single thread, no history UI) ────────────────────
+
+  function saveThread() {
+    if (!currentThreadId) return;
+    fetch('/threads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: currentThreadId,
+        title: 'Chat',
+        messages: conversation,
+        created_at: new Date().toISOString(),
+      }),
+    }).then(res => {
+      if (res.status === 401) {
+        currentUser = null;
+        updateUserUi();
+        toggleAuthModal(true);
+      }
+    }).catch(() => {});
   }
 
-  async function loadThreads() {
-    // load threads from the server, returning a Promise that resolves true/false
+  async function loadLatestThread() {
     return fetch('/threads').then(async res => {
-      if (res.status === 401) {
-        toggleAuthModal(true);
-        return false;
-      }
+      if (res.status === 401) { toggleAuthModal(true); return false; }
       return res.json();
     }).then(async data => {
-      if (!data || !data.days) return false;
-      const days = data.days;
-      const loaded = [];
-      for (const day of days) {
-        for (const tmeta of (day.threads || [])) {
-          try {
-            const r = await fetch(`/threads/${encodeURIComponent(day.date)}/${encodeURIComponent(tmeta.id)}`);
-            if (!r.ok) continue;
-            const tdata = await r.json();
-            loaded.push(tdata);
-          } catch (e) { continue; }
-        }
-      }
-      threads = loaded;
-      currentThreadId = threads[0] && threads[0].id;
-      return threads.length > 0;
+      if (!data || !data.days || !data.days.length) return false;
+      const latestDay = data.days[0];
+      if (!latestDay.threads || !latestDay.threads.length) return false;
+      // pick the most recent thread
+      const meta = latestDay.threads[latestDay.threads.length - 1];
+      try {
+        const r = await fetch(`/threads/${encodeURIComponent(latestDay.date)}/${encodeURIComponent(meta.id)}`);
+        if (!r.ok) return false;
+        const tdata = await r.json();
+        currentThreadId = tdata.id;
+        conversation = (tdata.messages || []).filter(m => m.role !== 'system');
+        return conversation.length > 0;
+      } catch (e) { return false; }
     }).catch(() => false);
   }
 
-  function renderThreads() {
-    if (!threadsEl) return;
-    threadsEl.innerHTML = '';
-    threads.forEach(t => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'thread-item' + (t.id === currentThreadId ? ' active' : '');
-      btn.setAttribute('data-thread-id', t.id);
-      const title = document.createElement('div');
-      title.className = 'thread-title';
-      title.textContent = t.title || 'Chat';
-      const preview = document.createElement('div');
-      preview.className = 'thread-preview';
-      const last = (t.messages && t.messages.length) ? t.messages[t.messages.length - 1] : null;
-      preview.textContent = last ? (last.content || '').slice(0, 120) : 'Empty';
-      btn.appendChild(title);
-      btn.appendChild(preview);
-      btn.addEventListener('click', function () { selectThread(t.id); });
-      threadsEl.appendChild(btn);
-    });
-  }
+  // ── Chat rendering ────────────────────────────────────────────────────────
 
-  function selectThread(id) {
-    const t = threads.find(x => x.id === id);
-    if (!t) return;
-    currentThreadId = id;
-    conversation = t.messages;
-    renderThreads();
-    renderThreadMessages();
-    saveThreads();
-  }
-
-  function createThread({ title = 'Chat', context = null } = {}) {
-    const id = genId();
-    const msgs = [];
-    if (context) {
-      // include preview as a system message to provide context
-      msgs.push({ role: 'system', content: context });
-    }
-    const t = { id: id, title: title, messages: msgs, created_at: new Date().toISOString() };
-    threads.unshift(t);
-    // select new thread
-    selectThread(id);
-    saveThreads();
-    return t;
-  }
-
-  function renderThreadMessages() {
-    // clear and render current conversation messages
+  function renderMessages() {
     while (messagesEl.firstChild) messagesEl.removeChild(messagesEl.firstChild);
     if (emptyState) messagesEl.appendChild(emptyState);
-    showEmptyState(true);
-    if (!conversation || !conversation.length) return;
-    // render each message
+    if (!conversation.length) { showEmptyState(true); return; }
+    showEmptyState(false);
     conversation.forEach(m => {
+      if (m.role === 'system') return;
       const div = document.createElement('div');
-      div.className = 'message ' + (m.role === 'assistant' ? 'assistant' : (m.role === 'system' ? 'system' : 'user'));
+      div.className = 'message ' + (m.role === 'assistant' ? 'assistant' : 'user');
       div.setAttribute('role', 'listitem');
       try {
         if (m.role === 'assistant') div.innerHTML = renderMessageContent(m.content);
@@ -193,40 +132,22 @@
     scrollToBottom();
   }
 
+  // ── Model loading ─────────────────────────────────────────────────────────
+
   async function loadModels() {
     if (!modelSelect) return;
     try {
       const res = await fetch("/models");
       if (res.status === 401) {
-        currentUser = null;
-        updateUserUi();
-        toggleAuthModal(true);
-        return;
+        currentUser = null; updateUserUi(); toggleAuthModal(true); return;
       }
       const data = await res.json();
       const models = data.models || [];
       modelSelect.innerHTML = "";
 
-      // models may be array of {name, modified_at, size, details}
-      // show selected model name in the badge when available, otherwise show count
-      if (modelSelect && modelSelect.value) {
-        if (modelBadge) modelBadge.textContent = modelSelect.value;
-      } else if (!modelBadge) {
-        // noop
-      } else if (models.length === 0) {
-        modelBadge.textContent = "No models";
-      } else {
-        // if models array contains objects, show first model name; otherwise show count
-        if (typeof models[0] === 'object' && models[0].name) {
-          modelBadge.textContent = models[0].name;
-          modelBadge.classList.add('active');
-        } else {
-          modelBadge.textContent = models.length + " model" + (models.length > 1 ? "s" : "");
-        }
-      }
-
       if (models.length === 0) {
         modelSelect.innerHTML = '<option value="">No models found</option>';
+        if (modelBadge) modelBadge.textContent = "No models";
         return;
       }
 
@@ -235,18 +156,15 @@
         const opt = document.createElement("option");
         opt.value = name;
         opt.textContent = name;
-        if (m && m.modified_at) opt.setAttribute('data-modified', m.modified_at);
         modelSelect.appendChild(opt);
       });
 
-      // choose first model by default if none selected
       if (!modelSelect.value && models.length) {
         const firstName = typeof models[0] === 'string' ? models[0] : models[0].name;
         modelSelect.value = firstName;
         updateSelectedModelDisplay(firstName);
       }
 
-      // populate modal list for mobile picker
       if (modelModalList) {
         modelModalList.innerHTML = "";
         models.forEach(function (m) {
@@ -260,13 +178,8 @@
           if (modified) {
             const meta = document.createElement('div');
             meta.className = 'model-meta';
-            // show a friendly formatted date if possible
-            try {
-              const d = new Date(modified);
-              meta.textContent = 'updated: ' + d.toLocaleString();
-            } catch (e) {
-              meta.textContent = modified;
-            }
+            try { meta.textContent = 'updated: ' + new Date(modified).toLocaleString(); }
+            catch (e) { meta.textContent = modified; }
             btn.appendChild(meta);
           }
           if (modelSelect && modelSelect.value === name) btn.classList.add('active');
@@ -279,37 +192,27 @@
         });
       }
     } catch (err) {
-      modelSelect.innerHTML = '<option value="">Failed to load models</option>';
+      if (modelSelect) modelSelect.innerHTML = '<option value="">Failed to load models</option>';
       if (modelBadge) modelBadge.textContent = "Load failed";
     }
   }
 
   function updateSelectedModelDisplay(name) {
     if (!name) return;
-    // update badge
-    if (modelBadge) {
-      modelBadge.textContent = name;
-      modelBadge.classList.add('active');
-    }
-    // update modal active state
+    if (modelBadge) { modelBadge.textContent = name; modelBadge.classList.add('active'); }
     if (modelModalList) {
-      const buttons = modelModalList.querySelectorAll('[data-model-name]');
-      buttons.forEach(function (b) {
-        if (b.getAttribute('data-model-name') === name) b.classList.add('active');
-        else b.classList.remove('active');
+      modelModalList.querySelectorAll('[data-model-name]').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-model-name') === name);
       });
     }
   }
 
-  // sync when the select changes
   if (modelSelect) {
-    modelSelect.addEventListener('change', function (e) {
-      const name = e.target.value;
-      updateSelectedModelDisplay(name);
-    });
+    modelSelect.addEventListener('change', e => updateSelectedModelDisplay(e.target.value));
   }
 
-  // Ensure messages area has enough bottom padding so the fixed input doesn't overlap
+  // ── Utilities ─────────────────────────────────────────────────────────────
+
   function updateMessagesPadding() {
     try {
       if (!messagesEl || !inputRow) return;
@@ -318,135 +221,87 @@
     } catch (e) {}
   }
 
-  // Keep messages scrolled to bottom when appropriate
   function ensureScrolled() {
     try { messagesEl.scrollTop = messagesEl.scrollHeight; } catch (e) {}
   }
 
-  // Lightweight markdown-ish renderer: supports headings (###), bold ** **,
-  // italics * *, inline code ``, code blocks ``` ```, lists, and tables (|).
-  // Also tolerates <br> tags in model output by converting them to newlines first.
   function escapeHtml(str) {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
   function renderMessageContent(raw) {
     if (!raw) return '';
-    // Convert any explicit <br> tags to newlines so markdown renderer handles them
-    let text = raw.replace(/<br\s*\/?\s*>/gi, '\n');
-
-    // Normalize CRLF
-    text = text.replace(/\r\n/g, '\n');
-
-    // Escape HTML to avoid raw injection, we'll add back allowed tags
+    let text = raw.replace(/<br\s*\/?\s*>/gi, '\n').replace(/\r\n/g, '\n');
     text = escapeHtml(text);
 
-    // Code blocks ``` ```
-    text = text.replace(/```([\s\S]*?)```/g, function(_, code) {
-      return '<pre class="md-code"><code>' + escapeHtml(code) + '</code></pre>';
-    });
+    text = text.replace(/```([\s\S]*?)```/g, (_, code) =>
+      '<pre class="md-code"><code>' + escapeHtml(code) + '</code></pre>');
+    text = text.replace(/`([^`]+?)`/g, (_, code) =>
+      '<code class="md-inline-code">' + escapeHtml(code) + '</code>');
 
-    // Inline code `code`
-    text = text.replace(/`([^`]+?)`/g, function(_, code) {
-      return '<code class="md-inline-code">' + escapeHtml(code) + '</code>';
-    });
-
-    // Headings ###
     text = text.replace(/^###\s*(.+)$/gm, '<h3 class="md-h3">$1</h3>');
     text = text.replace(/^##\s*(.+)$/gm, '<h4 class="md-h4">$1</h4>');
     text = text.replace(/^#\s*(.+)$/gm, '<h2 class="md-h2">$1</h2>');
-
-    // Bold **text**
     text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-    // Italic *text*
     text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
 
-    // Tables: detect contiguous blocks of lines containing '|' and render as a table.
-    // This is more robust for outputs that lack a separator row or come in streaming chunks.
+    // Tables
     {
       const linesArr = text.split('\n');
       const outLines = [];
       for (let i = 0; i < linesArr.length; i++) {
         const line = linesArr[i];
         if (line && line.indexOf('|') !== -1) {
-          // start candidate block
           let j = i;
           const block = [];
           while (j < linesArr.length && linesArr[j] && linesArr[j].indexOf('|') !== -1) {
-            block.push(linesArr[j].trim());
-            j++;
+            block.push(linesArr[j].trim()); j++;
           }
-
           if (block.length >= 2) {
-            // determine if second line is a separator (---|:---|---)
             const sep = block[1].replace(/\s/g, '');
-            const isSeparator = /^[:\-|]+$/.test(sep);
-
-            const headerLine = block[0];
-            const cols = headerLine.split('|').map(s => s.trim()).filter(Boolean);
-
+            const isSep = /^[:\-|]+$/.test(sep);
+            const cols = block[0].split('|').map(s => s.trim()).filter(Boolean);
             const rows = [];
-            const rowStart = isSeparator ? 2 : 1;
-            for (let k = rowStart; k < block.length; k++) {
-              const cells = block[k].split('|').map(s => s.trim()).filter(() => true);
-              // keep empty cells as empty strings but trim surrounding whitespace
+            for (let k = isSep ? 2 : 1; k < block.length; k++) {
               const cleaned = block[k].split('|').map(s => s.trim());
-              // remove leading/trailing empty due to pipes
-              const filtered = cleaned.filter((_, idx) => !(idx === 0 && cleaned[idx] === '') && !(idx === cleaned.length - 1 && cleaned[idx] === ''));
+              const filtered = cleaned.filter((_, idx) =>
+                !(idx === 0 && cleaned[idx] === '') && !(idx === cleaned.length - 1 && cleaned[idx] === ''));
               if (filtered.length) rows.push(filtered);
             }
-
-            // build table HTML
             let table = '<div class="md-table-wrap"><table class="md-table"><thead><tr>';
             cols.forEach(c => table += '<th>' + c + '</th>');
             table += '</tr></thead><tbody>';
             rows.forEach(r => {
               table += '<tr>';
-              for (let ci = 0; ci < cols.length; ci++) {
-                const cell = r[ci] !== undefined ? r[ci] : '';
-                table += '<td>' + cell + '</td>';
-              }
+              for (let ci = 0; ci < cols.length; ci++) table += '<td>' + (r[ci] || '') + '</td>';
               table += '</tr>';
             });
             table += '</tbody></table></div>';
-
             outLines.push(table);
             i = j - 1;
             continue;
           }
-          // not a table block, fall through and add line as-is
-          outLines.push(line);
-        } else {
-          outLines.push(line);
         }
+        outLines.push(line);
       }
       text = outLines.join('\n');
     }
 
-    // Unordered lists: lines starting with - or *
     text = text.replace(/(^|\n)([ \t]*[-\*] .+(\n[ \t]*[-\*] .+)*)/g, function(_, pre, listBlock) {
       const items = listBlock.trim().split('\n').map(l => l.replace(/^[-\*]\s?/, ''));
       return (pre || '') + '<ul class="md-ul">' + items.map(i => '<li>' + i + '</li>').join('') + '</ul>';
     });
 
-    // Paragraphs: split by two newlines
     const parts = text.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
-    const html = parts.map(p => {
-      // if already a block element (h2/h3/pre/table/ul) leave as is
+    return parts.map(p => {
       if (/^<(h2|h3|h4|pre|div|ul|table)/.test(p)) return p;
-      // replace single newlines with <br>
-      const withBreaks = p.replace(/\n/g, '<br>');
-      return '<p>' + withBreaks + '</p>';
+      return '<p>' + p.replace(/\n/g, '<br>') + '</p>';
     }).join('\n');
-
-    return html;
   }
 
   function openModelModal() {
     if (!modelModal) return;
     modelModal.setAttribute("aria-hidden", "false");
-    // focus first option if exists
     const first = modelModal.querySelector("button");
     if (first) first.focus();
   }
@@ -457,9 +312,10 @@
   }
 
   function startNewChat() {
-    const t = createThread({ title: 'Chat ' + (threads.length + 1) });
-    // persist newly created thread
-    saveThreads();
+    currentThreadId = genId();
+    conversation = [];
+    renderMessages();
+    saveThread();
     input.focus();
   }
 
@@ -497,11 +353,12 @@
     const div = document.createElement("div");
     div.className = "message assistant";
     div.setAttribute("role", "listitem");
-    div.textContent = "";
     messagesEl.appendChild(div);
     scrollToBottom();
     return div;
   }
+
+  // ── Send ──────────────────────────────────────────────────────────────────
 
   async function sendMessage() {
     const text = input.value.trim();
@@ -513,8 +370,7 @@
 
     const model = modelSelect ? modelSelect.value : "";
     if (!model) {
-      addMessage("assistant", "Please select a model from the dropdown.", true);
-      setStatus("", "error");
+      addMessage("assistant", "Please select a model.", true);
       return;
     }
 
@@ -530,16 +386,12 @@
       const res = await fetch("/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: conversation, model: model }),
+        body: JSON.stringify({ messages: conversation, model }),
       });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        if (res.status === 401) {
-          currentUser = null;
-          updateUserUi();
-          toggleAuthModal(true);
-        }
+        if (res.status === 401) { currentUser = null; updateUserUi(); toggleAuthModal(true); }
         messageEl.remove();
         addMessage("assistant", err.error || "Request failed", true);
         setStatus("", "error");
@@ -571,24 +423,17 @@
             }
             if (data.content) {
               fullContent += data.content;
-              // Render markdown/HTML-like content safely
-              try {
-                messageEl.innerHTML = renderMessageContent(fullContent);
-              } catch (e) {
-                // fallback to plain text
-                messageEl.textContent = fullContent;
-              }
+              try { messageEl.innerHTML = renderMessageContent(fullContent); }
+              catch (e) { messageEl.textContent = fullContent; }
               scrollToBottom();
             }
           } catch (_) {}
         }
       }
 
-  conversation.push({ role: "assistant", content: fullContent });
-  // update thread preview and persist
-  renderThreads();
-  saveThreads();
-  setStatus("");
+      conversation.push({ role: "assistant", content: fullContent });
+      saveThread();
+      setStatus("");
     } catch (err) {
       messageEl.remove();
       addMessage("assistant", "Network error: " + err.message, true);
@@ -599,36 +444,33 @@
     }
   }
 
-  form.addEventListener("submit", function (e) {
-    e.preventDefault();
-    sendMessage();
-  });
+  // ── Event listeners ───────────────────────────────────────────────────────
+
+  form.addEventListener("submit", e => { e.preventDefault(); sendMessage(); });
 
   if (newChatBtn) newChatBtn.addEventListener("click", startNewChat);
-  if (newChatBtnBottom) newChatBtnBottom.addEventListener("click", startNewChat);
+
   if (modelBadge) {
     modelBadge.setAttribute("role", "button");
     modelBadge.addEventListener("click", openModelModal);
   }
   if (modelModalClose) modelModalClose.addEventListener("click", closeModelModal);
-  if (modelModal) modelModal.addEventListener("click", function (e) {
-    if (e.target === modelModal) closeModelModal();
-  });
+  if (modelModal) modelModal.addEventListener("click", e => { if (e.target === modelModal) closeModelModal(); });
+
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async function () {
       await fetch('/auth/logout', { method: 'POST' }).catch(() => {});
-      threads = [];
-      currentThreadId = null;
       conversation = [];
+      currentThreadId = null;
       currentUser = null;
       updateUserUi();
-      renderThreads();
-      renderThreadMessages();
+      renderMessages();
       toggleAuthModal(true);
     });
   }
 
-  // Accessibility panel logic
+  // ── Accessibility ─────────────────────────────────────────────────────────
+
   const accessBtn = document.getElementById('access-btn');
   const accessPanel = document.getElementById('access-panel');
   const accessClose = document.getElementById('access-close');
@@ -638,106 +480,74 @@
   const accessReset = document.getElementById('access-reset');
 
   function applyAccessibility(settings) {
-    // settings: { size: 'md'|'sm'|'lg', theme: 'dark'|'light'|'sepia', weight: 'normal'|'bold' }
     const root = document.documentElement;
-    // remove previous theme classes
     root.classList.remove('theme-light', 'theme-dark', 'theme-sepia');
     if (settings.theme === 'dark') root.classList.add('theme-dark');
     if (settings.theme === 'light') root.classList.add('theme-light');
     if (settings.theme === 'sepia') root.classList.add('theme-sepia');
 
-    // font sizes on .app
     const appEl = document.querySelector('.app');
-    appEl.classList.remove('font-sm','font-md','font-lg');
+    appEl.classList.remove('font-sm', 'font-md', 'font-lg');
     appEl.classList.add(settings.size ? ('font-' + settings.size) : 'font-md');
 
-    // weight
-    appEl.classList.remove('weight-normal','weight-bold');
+    appEl.classList.remove('weight-normal', 'weight-bold');
     appEl.classList.add(settings.weight === 'bold' ? 'weight-bold' : 'weight-normal');
 
-    // update active buttons
     fontBtns.forEach(b => b.classList.toggle('active', b.dataset.size === settings.size));
     themeBtns.forEach(b => b.classList.toggle('active', b.dataset.theme === settings.theme));
     weightBtns.forEach(b => b.classList.toggle('active', b.dataset.weight === settings.weight));
   }
 
-  function saveAccessibility(settings) {
-    try { localStorage.setItem('accessibility', JSON.stringify(settings)); } catch(e){}
+  function saveAccessibility(s) {
+    try { localStorage.setItem('accessibility', JSON.stringify(s)); } catch (e) {}
   }
-
   function loadAccessibility() {
-    try { return JSON.parse(localStorage.getItem('accessibility') || 'null'); } catch(e) { return null; }
+    try { return JSON.parse(localStorage.getItem('accessibility') || 'null'); } catch (e) { return null; }
   }
 
-  function openAccessPanel() {
-    if (!accessPanel) return;
-    accessPanel.setAttribute('aria-hidden','false');
-    if (accessBtn) accessBtn.setAttribute('aria-expanded','true');
-  }
-  function closeAccessPanel() {
-    if (!accessPanel) return;
-    accessPanel.setAttribute('aria-hidden','true');
-    if (accessBtn) accessBtn.setAttribute('aria-expanded','false');
-  }
-
-  if (accessBtn) accessBtn.addEventListener('click', openAccessPanel);
-  if (accessClose) accessClose.addEventListener('click', closeAccessPanel);
-  if (accessPanel) accessPanel.addEventListener('click', function(e){ if (e.target === accessPanel) closeAccessPanel(); });
-
-  fontBtns.forEach(b => b.addEventListener('click', function(){
-    const size = b.dataset.size || 'md';
-    const settings = Object.assign({size:size}, loadAccessibility() || {});
-    settings.size = size;
-    applyAccessibility(settings);
-    saveAccessibility(settings);
-  }));
-
-  themeBtns.forEach(b => b.addEventListener('click', function(){
-    const theme = b.dataset.theme || 'dark';
-    const settings = Object.assign({theme:theme}, loadAccessibility() || {});
-    settings.theme = theme;
-    applyAccessibility(settings);
-    saveAccessibility(settings);
-  }));
-
-  weightBtns.forEach(b => b.addEventListener('click', function(){
-    const weight = b.dataset.weight || 'normal';
-    const settings = Object.assign({weight:weight}, loadAccessibility() || {});
-    settings.weight = weight;
-    applyAccessibility(settings);
-    saveAccessibility(settings);
-  }));
-
-  if (accessReset) accessReset.addEventListener('click', function(){
-    const defaults = { size: 'md', theme: 'light', weight: 'normal' };
-    applyAccessibility(defaults);
-    saveAccessibility(defaults);
+  if (accessBtn) accessBtn.addEventListener('click', () => {
+    accessPanel.setAttribute('aria-hidden', 'false');
+    accessBtn.setAttribute('aria-expanded', 'true');
+  });
+  if (accessClose) accessClose.addEventListener('click', () => {
+    accessPanel.setAttribute('aria-hidden', 'true');
+    accessBtn.setAttribute('aria-expanded', 'false');
+  });
+  if (accessPanel) accessPanel.addEventListener('click', e => {
+    if (e.target === accessPanel) { accessPanel.setAttribute('aria-hidden', 'true'); accessBtn.setAttribute('aria-expanded', 'false'); }
   });
 
-  // Apply saved settings on load
+  fontBtns.forEach(b => b.addEventListener('click', function () {
+    const s = Object.assign({}, loadAccessibility() || {}, { size: b.dataset.size || 'md' });
+    applyAccessibility(s); saveAccessibility(s);
+  }));
+  themeBtns.forEach(b => b.addEventListener('click', function () {
+    const s = Object.assign({}, loadAccessibility() || {}, { theme: b.dataset.theme || 'light' });
+    applyAccessibility(s); saveAccessibility(s);
+  }));
+  weightBtns.forEach(b => b.addEventListener('click', function () {
+    const s = Object.assign({}, loadAccessibility() || {}, { weight: b.dataset.weight || 'normal' });
+    applyAccessibility(s); saveAccessibility(s);
+  }));
+  if (accessReset) accessReset.addEventListener('click', function () {
+    const defaults = { size: 'md', theme: 'light', weight: 'normal' };
+    applyAccessibility(defaults); saveAccessibility(defaults);
+  });
+
   const saved = loadAccessibility();
   if (saved) applyAccessibility(saved);
 
-  // initialize app: load threads from server (or create a default)
-  async function initApp() {
-    const ok = await loadThreads();
-    if (!ok || !threads.length) {
-      createThread({ title: 'Chat 1' });
-      // persist immediately
-      saveThreads();
-    } else {
-      // select loaded or first
-      if (!currentThreadId && threads.length) currentThreadId = threads[0].id;
-      const t = threads.find(x => x.id === currentThreadId) || threads[0];
-      if (t) conversation = t.messages;
-    }
-    renderThreads();
-    renderThreadMessages();
+  // ── Init ──────────────────────────────────────────────────────────────────
 
+  async function initApp() {
+    const hasHistory = await loadLatestThread();
+    if (!hasHistory) {
+      currentThreadId = genId();
+      conversation = [];
+    }
+    renderMessages();
     await loadModels();
-    if (emptyState) showEmptyState(true);
-    // update padding and scroll on load
-    setTimeout(function () { updateMessagesPadding(); ensureScrolled(); try { input.focus(); } catch (e) {} }, 120);
+    setTimeout(() => { updateMessagesPadding(); ensureScrolled(); try { input.focus(); } catch (e) {} }, 120);
   }
 
   async function init() {
@@ -760,20 +570,13 @@
           body: JSON.stringify({ name, email, password }),
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          setAuthError(data.error || 'Unable to create account');
-          return;
-        }
+        if (!res.ok) { setAuthError(data.error || 'Unable to create account'); return; }
         currentUser = data.user || null;
         updateUserUi();
         toggleAuthModal(false);
-        threads = [];
-        currentThreadId = null;
-        conversation = [];
+        conversation = []; currentThreadId = null;
         await initApp();
-      } catch (err) {
-        setAuthError('Network error while creating account');
-      }
+      } catch (err) { setAuthError('Network error while creating account'); }
     });
   }
 
@@ -790,36 +593,25 @@
           body: JSON.stringify({ email, password }),
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          setAuthError(data.error || 'Unable to sign in');
-          return;
-        }
+        if (!res.ok) { setAuthError(data.error || 'Unable to sign in'); return; }
         currentUser = data.user || null;
         updateUserUi();
         toggleAuthModal(false);
-        threads = [];
-        currentThreadId = null;
-        conversation = [];
+        conversation = []; currentThreadId = null;
         await initApp();
-      } catch (err) {
-        setAuthError('Network error while signing in');
-      }
+      } catch (err) { setAuthError('Network error while signing in'); }
     });
   }
 
   init();
 
-  // Register the service worker for PWA installability and offline caching
+  // ── PWA / Service Worker ──────────────────────────────────────────────────
+
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/service-worker.js')
       .then(reg => {
-        console.log('Service worker registered', reg.scope);
         reg.update().catch(() => {});
-        if (reg.waiting) console.log('Service worker waiting');
-        if (reg.active) console.log('Service worker active');
-      }).catch(err => {
-        console.warn('Service worker registration failed:', err);
-      });
+      }).catch(() => {});
 
     let reloadedByController = false;
     navigator.serviceWorker.addEventListener('controllerchange', function () {
@@ -829,52 +621,32 @@
     });
   }
 
-  // PWA install flow: capture the beforeinstallprompt event and show our own button
   let deferredPrompt = null;
   const installBtn = document.getElementById('install-btn');
-  window.addEventListener('beforeinstallprompt', (e) => {
-    console.log('beforeinstallprompt fired');
-    // Prevent the mini-infobar from appearing on mobile
+  window.addEventListener('beforeinstallprompt', e => {
     e.preventDefault();
     deferredPrompt = e;
-    if (installBtn) {
-      installBtn.hidden = false;
-      installBtn.classList.add('show');
-    }
+    if (installBtn) { installBtn.hidden = false; installBtn.classList.add('show'); }
     return false;
   });
-
-  // Fallback: check whether app is already installable via crossorigin manifest check
-  (async function checkInstallable() {
-    try {
-      const resp = await fetch('/static/manifest.json');
-      if (!resp.ok) return;
-      const manifest = await resp.json();
-      console.log('manifest loaded', manifest.name || manifest.short_name);
-    } catch (e) { console.warn('manifest fetch failed', e); }
-  })();
 
   if (installBtn) {
     installBtn.addEventListener('click', async function () {
       if (!deferredPrompt) {
-        // If we don't have the event, let user know to use browser menu
-        alert('Install not available: try using the browser menu (Add to Home screen) or ensure the page is served over HTTPS and the site is installable.');
+        alert('Use the browser menu to install this app.');
         return;
       }
       installBtn.disabled = true;
       deferredPrompt.prompt();
       const choice = await deferredPrompt.userChoice;
-      console.log('User choice', choice);
-      if (choice && choice.outcome === 'accepted') {
-        installBtn.hidden = true;
-      } else {
-        installBtn.disabled = false;
-      }
+      if (choice && choice.outcome === 'accepted') installBtn.hidden = true;
+      else installBtn.disabled = false;
       deferredPrompt = null;
     });
   }
 
-  // adjust on resize/orientation change
-  window.addEventListener('resize', function () { updateMessagesPadding(); ensureScrolled(); });
-  window.addEventListener('orientationchange', function () { setTimeout(function(){ updateMessagesPadding(); ensureScrolled(); }, 120); });
+  window.addEventListener('resize', () => { updateMessagesPadding(); ensureScrolled(); });
+  window.addEventListener('orientationchange', () => {
+    setTimeout(() => { updateMessagesPadding(); ensureScrolled(); }, 120);
+  });
 })();

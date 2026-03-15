@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ai-chat-v7';
+const CACHE_NAME = 'ai-chat-v8';
 const APP_PREFIX = 'ai-chat-';
 const ASSETS_TO_CACHE = [
   '/static/style.css?v=7',
