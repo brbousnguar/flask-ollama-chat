@@ -641,7 +641,8 @@
     // settings: { size: 'md'|'sm'|'lg', theme: 'dark'|'light'|'sepia', weight: 'normal'|'bold' }
     const root = document.documentElement;
     // remove previous theme classes
-    root.classList.remove('theme-light', 'theme-sepia');
+    root.classList.remove('theme-light', 'theme-dark', 'theme-sepia');
+    if (settings.theme === 'dark') root.classList.add('theme-dark');
     if (settings.theme === 'light') root.classList.add('theme-light');
     if (settings.theme === 'sepia') root.classList.add('theme-sepia');
 
@@ -708,7 +709,7 @@
   }));
 
   if (accessReset) accessReset.addEventListener('click', function(){
-    const defaults = { size: 'md', theme: 'dark', weight: 'normal' };
+    const defaults = { size: 'md', theme: 'light', weight: 'normal' };
     applyAccessibility(defaults);
     saveAccessibility(defaults);
   });
