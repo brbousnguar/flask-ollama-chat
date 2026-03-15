@@ -20,18 +20,15 @@
             <span class="header-icon" aria-hidden="true">◆</span>
             <span>AI Assistant</span>
           </div>
-          <div id="model-badge" class="model-badge" aria-live="polite" title="Models available">…</div>
         </div>
 
         <div class="header-right">
+          <select id="model-select" class="model-select" aria-label="Select model">
+            <option value="">Loading models…</option>
+          </select>
           <div id="user-box" class="user-box" hidden>
             <span id="user-name" class="user-name"></span>
             <button type="button" id="logout-btn" class="logout-btn" aria-label="Logout">Logout</button>
-          </div>
-          <div class="model-wrap">
-            <select id="model-select" class="model-select" aria-label="Select model">
-              <option value="">Loading models…</option>
-            </select>
           </div>
           <button type="button" id="new-chat-btn" class="new-chat-btn" aria-label="Start new chat">New chat</button>
           <button id="install-btn" class="install-btn" aria-label="Install app" title="Install app" hidden>Install</button>
@@ -71,17 +68,6 @@
 
       <div id="status" class="status" aria-live="polite"></div>
     </main>
-  </div>
-
-  <!-- Mobile model picker modal -->
-  <div id="model-modal" class="model-modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="model-modal-title">
-    <div class="model-modal-sheet">
-      <div class="model-modal-header">
-        <h3 id="model-modal-title">Choose model</h3>
-        <button id="model-modal-close" class="model-modal-close" aria-label="Close">✕</button>
-      </div>
-      <div id="model-modal-list" class="model-modal-list" role="list"></div>
-    </div>
   </div>
 
   <!-- Accessibility panel -->

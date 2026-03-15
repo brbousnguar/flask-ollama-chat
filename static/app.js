@@ -8,10 +8,6 @@
   const sendBtn = document.getElementById("send-btn");
   const newChatBtn = document.getElementById("new-chat-btn");
   const modelSelect = document.getElementById("model-select");
-  const modelBadge = document.getElementById("model-badge");
-  const modelModal = document.getElementById("model-modal");
-  const modelModalList = document.getElementById("model-modal-list");
-  const modelModalClose = document.getElementById("model-modal-close");
   const inputRow = document.querySelector('.input-row');
   const authModal = document.getElementById('auth-modal');
   const authError = document.getElementById('auth-error');
@@ -147,7 +143,6 @@
 
       if (models.length === 0) {
         modelSelect.innerHTML = '<option value="">No models found</option>';
-        if (modelBadge) modelBadge.textContent = "No models";
         return;
       }
 
@@ -162,53 +157,10 @@
       if (!modelSelect.value && models.length) {
         const firstName = typeof models[0] === 'string' ? models[0] : models[0].name;
         modelSelect.value = firstName;
-        updateSelectedModelDisplay(firstName);
-      }
-
-      if (modelModalList) {
-        modelModalList.innerHTML = "";
-        models.forEach(function (m) {
-          const name = typeof m === 'string' ? m : (m.name || '');
-          const modified = (m && m.modified_at) ? m.modified_at : null;
-          const btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = "model-option";
-          btn.setAttribute('data-model-name', name);
-          btn.textContent = name;
-          if (modified) {
-            const meta = document.createElement('div');
-            meta.className = 'model-meta';
-            try { meta.textContent = 'updated: ' + new Date(modified).toLocaleString(); }
-            catch (e) { meta.textContent = modified; }
-            btn.appendChild(meta);
-          }
-          if (modelSelect && modelSelect.value === name) btn.classList.add('active');
-          btn.addEventListener("click", function () {
-            modelSelect.value = name;
-            updateSelectedModelDisplay(name);
-            closeModelModal();
-          });
-          modelModalList.appendChild(btn);
-        });
       }
     } catch (err) {
       if (modelSelect) modelSelect.innerHTML = '<option value="">Failed to load models</option>';
-      if (modelBadge) modelBadge.textContent = "Load failed";
     }
-  }
-
-  function updateSelectedModelDisplay(name) {
-    if (!name) return;
-    if (modelBadge) { modelBadge.textContent = name; modelBadge.classList.add('active'); }
-    if (modelModalList) {
-      modelModalList.querySelectorAll('[data-model-name]').forEach(b => {
-        b.classList.toggle('active', b.getAttribute('data-model-name') === name);
-      });
-    }
-  }
-
-  if (modelSelect) {
-    modelSelect.addEventListener('change', e => updateSelectedModelDisplay(e.target.value));
   }
 
   // ── Utilities ─────────────────────────────────────────────────────────────
@@ -297,18 +249,6 @@
       if (/^<(h2|h3|h4|pre|div|ul|table)/.test(p)) return p;
       return '<p>' + p.replace(/\n/g, '<br>') + '</p>';
     }).join('\n');
-  }
-
-  function openModelModal() {
-    if (!modelModal) return;
-    modelModal.setAttribute("aria-hidden", "false");
-    const first = modelModal.querySelector("button");
-    if (first) first.focus();
-  }
-
-  function closeModelModal() {
-    if (!modelModal) return;
-    modelModal.setAttribute("aria-hidden", "true");
   }
 
   function startNewChat() {
@@ -449,13 +389,6 @@
   form.addEventListener("submit", e => { e.preventDefault(); sendMessage(); });
 
   if (newChatBtn) newChatBtn.addEventListener("click", startNewChat);
-
-  if (modelBadge) {
-    modelBadge.setAttribute("role", "button");
-    modelBadge.addEventListener("click", openModelModal);
-  }
-  if (modelModalClose) modelModalClose.addEventListener("click", closeModelModal);
-  if (modelModal) modelModal.addEventListener("click", e => { if (e.target === modelModal) closeModelModal(); });
 
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async function () {
