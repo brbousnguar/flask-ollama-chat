@@ -6,7 +6,9 @@
       "mcp__playwright__browser_evaluate",
       "Bash(cd:*)",
       "mcp__playwright__browser_fill_form",
-      "mcp__playwright__browser_click"
+      "mcp__playwright__browser_click",
+      "Bash(curl:*)",
+      "mcp__playwright__browser_snapshot"
     ]
   }
 }

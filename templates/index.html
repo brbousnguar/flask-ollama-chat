@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bree+Serif&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/style.css?v=7">
+  <link rel="stylesheet" href="/static/style.css?v=8">
 </head>
 <body>
   <div class="app">
@@ -23,13 +23,20 @@
         </div>
 
         <div class="header-right">
-          <select id="model-select" class="model-select" aria-label="Select model">
-            <option value="">Loading models…</option>
-          </select>
+          <div class="model-dropdown" id="model-dropdown-wrap">
+            <button type="button" class="model-dropdown-btn" id="model-dropdown-btn"
+                    aria-haspopup="listbox" aria-expanded="false" aria-label="Select model">
+              <span class="model-dropdown-current" id="model-dropdown-current">Loading models…</span>
+              <span class="model-dropdown-arrow" aria-hidden="true">▾</span>
+            </button>
+            <div class="model-dropdown-list" id="model-dropdown-list" role="listbox" hidden></div>
+          </div>
+          <select id="model-select" hidden aria-hidden="true"></select>
           <div id="user-box" class="user-box" hidden>
             <span id="user-name" class="user-name"></span>
             <button type="button" id="logout-btn" class="logout-btn" aria-label="Logout">Logout</button>
           </div>
+          <button type="button" id="models-btn" class="models-btn" aria-label="Browse models">Models</button>
           <button type="button" id="new-chat-btn" class="new-chat-btn" aria-label="Start new chat">New chat</button>
           <button id="install-btn" class="install-btn" aria-label="Install app" title="Install app" hidden>Install</button>
           <button id="access-btn" class="access-btn" aria-haspopup="true" aria-expanded="false" aria-controls="access-panel" title="Accessibility options">Aa</button>
@@ -68,6 +75,27 @@
 
       <div id="status" class="status" aria-live="polite"></div>
     </main>
+  </div>
+
+  <!-- Models panel -->
+  <div id="models-panel" class="models-panel" aria-hidden="true" role="dialog" aria-label="Browse models">
+    <div class="models-sheet">
+      <div class="models-panel-header">
+        <div class="models-panel-title">
+          <h2>Models</h2>
+          <span class="models-panel-sub">Discover and manage your Ollama models</span>
+        </div>
+        <div class="models-panel-actions">
+          <input id="models-search" type="search" class="models-search" placeholder="Search models…" autocomplete="off">
+          <button id="models-close" class="models-close" aria-label="Close">✕</button>
+        </div>
+      </div>
+      <div class="models-tabs" role="tablist">
+        <button class="models-tab active" data-tab="local" role="tab">Local <span id="local-count" class="tab-count"></span></button>
+        <button class="models-tab" data-tab="library" role="tab">Library <span class="tab-hint">ollama.com</span></button>
+      </div>
+      <div id="models-list" class="models-list" role="tabpanel"></div>
+    </div>
   </div>
 
   <!-- Accessibility panel -->
@@ -133,6 +161,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=7"></script>
+  <script src="/static/app.js?v=8"></script>
 </body>
 </html>

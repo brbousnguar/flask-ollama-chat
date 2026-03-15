@@ -7,7 +7,11 @@
   const statusEl = document.getElementById("status");
   const sendBtn = document.getElementById("send-btn");
   const newChatBtn = document.getElementById("new-chat-btn");
-  const modelSelect = document.getElementById("model-select");
+  const modelSelect        = document.getElementById("model-select");
+  const modelDropdownBtn   = document.getElementById("model-dropdown-btn");
+  const modelDropdownList  = document.getElementById("model-dropdown-list");
+  const modelDropdownCurrent = document.getElementById("model-dropdown-current");
+  let _dropdownOpen = false;
   const inputRow = document.querySelector('.input-row');
   const authModal = document.getElementById('auth-modal');
   const authError = document.getElementById('auth-error');
@@ -20,6 +24,11 @@
   let conversation = [];
   let currentThreadId = null;
   let currentUser = null;
+
+  // shared state for models panel (populated by loadModels)
+  let _localModels = [];
+  let _libraryModels = [];
+  let _libraryLoaded = false;
 
   function genId() {
     return 't_' + Math.random().toString(36).slice(2, 9);
@@ -128,10 +137,107 @@
     scrollToBottom();
   }
 
+  // ── Custom model dropdown ─────────────────────────────────────────────────
+
+  function _flagImg(origin) {
+    if (!origin) return null;
+    const img = document.createElement('img');
+    img.src = 'https://flagcdn.com/16x12/' + origin.code + '.png';
+    img.width = 16; img.height = 12;
+    img.alt = origin.country; img.title = origin.country;
+    img.className = 'model-flag';
+    return img;
+  }
+
+  function _updateDropdownLabel(name) {
+    if (!modelDropdownCurrent) return;
+    modelDropdownCurrent.innerHTML = '';
+    const origin = _countryFlag(name);
+    const img = _flagImg(origin);
+    if (img) modelDropdownCurrent.appendChild(img);
+    modelDropdownCurrent.appendChild(document.createTextNode(name || 'Select model'));
+  }
+
+  function _openModelDropdown() {
+    if (!modelDropdownList || _dropdownOpen) return;
+    _dropdownOpen = true;
+    modelDropdownList.hidden = false;
+    if (modelDropdownBtn) modelDropdownBtn.setAttribute('aria-expanded', 'true');
+  }
+
+  function _closeModelDropdown() {
+    if (!modelDropdownList || !_dropdownOpen) return;
+    _dropdownOpen = false;
+    modelDropdownList.hidden = true;
+    if (modelDropdownBtn) modelDropdownBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  function _selectModelDropdown(name) {
+    if (modelSelect) { modelSelect.value = name; }
+    _updateDropdownLabel(name);
+    // update active state in list
+    if (modelDropdownList) {
+      modelDropdownList.querySelectorAll('.model-dropdown-item').forEach(el => {
+        el.classList.toggle('selected', el.dataset.value === name);
+      });
+    }
+    _closeModelDropdown();
+  }
+
+  function _populateModelDropdown(models) {
+    if (!modelDropdownList || !modelSelect) return;
+    modelDropdownList.innerHTML = '';
+    modelSelect.innerHTML = '';
+
+    if (!models.length) {
+      modelDropdownCurrent.textContent = 'No models found';
+      return;
+    }
+
+    models.forEach(m => {
+      const name = typeof m === 'string' ? m : (m.name || '');
+      // hidden select option
+      const opt = document.createElement('option');
+      opt.value = name; opt.textContent = name;
+      modelSelect.appendChild(opt);
+
+      // custom item
+      const item = document.createElement('div');
+      item.className = 'model-dropdown-item';
+      item.setAttribute('role', 'option');
+      item.dataset.value = name;
+      const origin = _countryFlag(name);
+      const img = _flagImg(origin);
+      if (img) item.appendChild(img);
+      item.appendChild(document.createTextNode(name));
+      item.addEventListener('click', () => _selectModelDropdown(name));
+      modelDropdownList.appendChild(item);
+    });
+
+    // select first by default
+    const firstName = typeof models[0] === 'string' ? models[0] : models[0].name;
+    modelSelect.value = firstName;
+    _updateDropdownLabel(firstName);
+    modelDropdownList.querySelector('.model-dropdown-item').classList.add('selected');
+  }
+
+  if (modelDropdownBtn) {
+    modelDropdownBtn.addEventListener('click', () => {
+      _dropdownOpen ? _closeModelDropdown() : _openModelDropdown();
+    });
+  }
+  document.addEventListener('click', e => {
+    if (_dropdownOpen && modelDropdownBtn && !modelDropdownBtn.closest('.model-dropdown').contains(e.target)) {
+      _closeModelDropdown();
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && _dropdownOpen) _closeModelDropdown();
+  });
+
   // ── Model loading ─────────────────────────────────────────────────────────
 
   async function loadModels() {
-    if (!modelSelect) return;
     try {
       const res = await fetch("/models");
       if (res.status === 401) {
@@ -139,27 +245,11 @@
       }
       const data = await res.json();
       const models = data.models || [];
-      modelSelect.innerHTML = "";
-
-      if (models.length === 0) {
-        modelSelect.innerHTML = '<option value="">No models found</option>';
-        return;
-      }
-
-      models.forEach(function (m) {
-        const name = typeof m === 'string' ? m : (m.name || '');
-        const opt = document.createElement("option");
-        opt.value = name;
-        opt.textContent = name;
-        modelSelect.appendChild(opt);
-      });
-
-      if (!modelSelect.value && models.length) {
-        const firstName = typeof models[0] === 'string' ? models[0] : models[0].name;
-        modelSelect.value = firstName;
-      }
+      _populateModelDropdown(models);
+      _localModels = models;
+      if (localCount) localCount.textContent = _localModels.length;
     } catch (err) {
-      if (modelSelect) modelSelect.innerHTML = '<option value="">Failed to load models</option>';
+      if (modelDropdownCurrent) modelDropdownCurrent.textContent = 'Failed to load models';
     }
   }
 
@@ -399,6 +489,290 @@
       updateUserUi();
       renderMessages();
       toggleAuthModal(true);
+    });
+  }
+
+  // ── Models panel ─────────────────────────────────────────────────────────
+
+  const modelsBtn    = document.getElementById('models-btn');
+  const modelsPanel  = document.getElementById('models-panel');
+  const modelsClose  = document.getElementById('models-close');
+  const modelsSearch = document.getElementById('models-search');
+  const modelsList   = document.getElementById('models-list');
+  const localCount   = document.getElementById('local-count');
+  const modelsTabs   = document.querySelectorAll('.models-tab');
+
+  let _modelsTab = 'local';
+
+  function openModelsPanel() {
+    if (!modelsPanel) return;
+    modelsPanel.setAttribute('aria-hidden', 'false');
+    if (modelsBtn) modelsBtn.classList.add('open');
+    if (modelsSearch) { modelsSearch.value = ''; modelsSearch.focus(); }
+    _renderModelsTab();
+    if (_modelsTab === 'library' && !_libraryLoaded) _loadLibrary();
+  }
+
+  function closeModelsPanel() {
+    if (!modelsPanel) return;
+    modelsPanel.setAttribute('aria-hidden', 'true');
+    if (modelsBtn) modelsBtn.classList.remove('open');
+  }
+
+  function _countryFlag(name) {
+    const n = (name || '').toLowerCase().replace(/^[^/]*\//, ''); // strip namespace prefix
+    // USA
+    if (/^llama|^codellama/.test(n))            return { code: 'us', country: 'Meta · USA' };
+    if (/^gemma|^codegemma/.test(n))            return { code: 'us', country: 'Google · USA' };
+    if (/^phi\d|^phi:|^phi-/.test(n))           return { code: 'us', country: 'Microsoft · USA' };
+    if (/^wizard|^orca(?![\w])/.test(n))        return { code: 'us', country: 'Microsoft · USA' };
+    if (/^granite/.test(n))                     return { code: 'us', country: 'IBM · USA' };
+    if (/^llava/.test(n))                       return { code: 'us', country: 'LLaVA · USA' };
+    if (/^hermes|^openhermes|^nous/.test(n))    return { code: 'us', country: 'Nous Research · USA' };
+    if (/^nemotron/.test(n))                    return { code: 'us', country: 'NVIDIA · USA' };
+    if (/^arctic/.test(n))                      return { code: 'us', country: 'Snowflake · USA' };
+    if (/^nomic/.test(n))                       return { code: 'us', country: 'Nomic · USA' };
+    if (/^neural-chat/.test(n))                 return { code: 'us', country: 'Intel · USA' };
+    if (/^bespoke/.test(n))                     return { code: 'us', country: 'Bespoke Labs · USA' };
+    if (/^openelm/.test(n))                     return { code: 'us', country: 'Apple · USA' };
+    if (/^grok/.test(n))                        return { code: 'us', country: 'xAI · USA' };
+    if (/^dolphin/.test(n))                     return { code: 'us', country: 'Cognitive Computations · USA' };
+    if (/^vicuna|^alpaca/.test(n))              return { code: 'us', country: 'UC Berkeley · USA' };
+    if (/^tinyllama/.test(n))                   return { code: 'sg', country: 'TinyLlama · Singapore' };
+    if (/^gpt-oss/.test(n))                     return { code: 'us', country: 'Microsoft · USA' };
+    // France
+    if (/^mistral|^mixtral|^codestral|^devstral|^magistral/.test(n)) return { code: 'fr', country: 'Mistral AI · France' };
+    if (/^starcoder/.test(n))                   return { code: 'fr', country: 'BigCode · France' };
+    if (/^zephyr|^smollm/.test(n))              return { code: 'fr', country: 'Hugging Face · France' };
+    // China
+    if (/^qwen/.test(n))                        return { code: 'cn', country: 'Alibaba · China' };
+    if (/^deepseek/.test(n))                    return { code: 'cn', country: 'DeepSeek · China' };
+    if (/^yi[-\d]/.test(n))                     return { code: 'cn', country: '01.AI · China' };
+    if (/^internlm/.test(n))                    return { code: 'cn', country: 'Shanghai AI Lab · China' };
+    if (/^baichuan/.test(n))                    return { code: 'cn', country: 'Baichuan AI · China' };
+    if (/^glm|^codegeex/.test(n))               return { code: 'cn', country: 'Zhipu AI · China' };
+    if (/^minicpm/.test(n))                     return { code: 'cn', country: 'ModelBest · China' };
+    // Canada
+    if (/^command|^aya/.test(n))                return { code: 'ca', country: 'Cohere · Canada' };
+    // UAE
+    if (/^falcon/.test(n))                      return { code: 'ae', country: 'TII · UAE' };
+    // South Korea
+    if (/^solar/.test(n))                       return { code: 'kr', country: 'Upstage · South Korea' };
+    if (/^exaone/.test(n))                      return { code: 'kr', country: 'LG AI · South Korea' };
+    // UK
+    if (/^stablelm|^stable-code/.test(n))       return { code: 'gb', country: 'Stability AI · UK' };
+    // Germany
+    if (/^mxbai/.test(n))                       return { code: 'de', country: 'MixedBread · Germany' };
+    return null;
+  }
+
+  function _modelTags(name) {
+    const n = (name || '').toLowerCase();
+    const tags = [];
+    if (/vision|vl\b|-vl|vlm|llava|minicpm-v/.test(n)) tags.push({ label: 'Vision',   cls: 'badge-vision' });
+    if (/coder|code|starcoder|deepseek-coder/.test(n))   tags.push({ label: 'Code',     cls: 'badge-code' });
+    if (/math/.test(n))                                  tags.push({ label: 'Math',     cls: 'badge-math' });
+    if (/instruct/.test(n))                              tags.push({ label: 'Instruct', cls: 'badge-instruct' });
+    if (/embed/.test(n))                                 tags.push({ label: 'Embed',    cls: 'badge-embed' });
+    return tags;
+  }
+
+  function _sizeLabel(bytes) {
+    if (!bytes) return null;
+    const gb = bytes / 1e9;
+    return gb >= 1 ? gb.toFixed(1) + ' GB' : (bytes / 1e6).toFixed(0) + ' MB';
+  }
+
+  function _paramLabel(details, name) {
+    if (details && details.parameter_size) return details.parameter_size;
+    const m = (name || '').match(/:?(\d+\.?\d*)([bBmM])/);
+    if (m) return m[1] + m[2].toUpperCase();
+    return null;
+  }
+
+  function _buildLocalCard(m) {
+    const isActive = m.name === (modelSelect ? modelSelect.value : '');
+    const tags = _modelTags(m.name);
+    const origin = _countryFlag(m.name);
+    const param = _paramLabel(m.details, m.name);
+    const quant = m.details && m.details.quantization_level;
+    const size  = _sizeLabel(m.size);
+
+    const card = document.createElement('div');
+    card.className = 'model-card' + (isActive ? ' is-active' : '');
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'model-card-name';
+    if (origin) {
+      const img = document.createElement('img');
+      img.src = 'https://flagcdn.com/16x12/' + origin.code + '.png';
+      img.width = 16; img.height = 12;
+      img.alt = origin.country; img.title = origin.country;
+      img.className = 'model-flag';
+      nameEl.appendChild(img);
+      nameEl.appendChild(document.createTextNode(m.name));
+    } else {
+      nameEl.textContent = m.name;
+    }
+
+    const badges = document.createElement('div');
+    badges.className = 'model-badges';
+    const instBadge = document.createElement('span');
+    instBadge.className = 'badge badge-installed';
+    instBadge.textContent = '✓ Installed';
+    badges.appendChild(instBadge);
+    if (param) { const b = document.createElement('span'); b.className = 'badge badge-size'; b.textContent = param; badges.appendChild(b); }
+    tags.forEach(t => { const b = document.createElement('span'); b.className = 'badge ' + t.cls; b.textContent = t.label; badges.appendChild(b); });
+
+    const meta = document.createElement('div');
+    meta.className = 'model-card-meta';
+    const info = document.createElement('span');
+    const parts = [];
+    if (quant) parts.push(quant);
+    if (size)  parts.push(size);
+    info.textContent = parts.join(' · ');
+
+    const useBtn = document.createElement('button');
+    useBtn.className = 'model-card-select' + (isActive ? ' active-model' : '');
+    useBtn.textContent = isActive ? 'Active' : 'Use';
+    if (!isActive) {
+      useBtn.addEventListener('click', () => {
+        _selectModelDropdown(m.name);
+        closeModelsPanel();
+      });
+    }
+
+    meta.appendChild(info);
+    meta.appendChild(useBtn);
+    card.appendChild(nameEl);
+    card.appendChild(badges);
+    card.appendChild(meta);
+    return card;
+  }
+
+  function _buildLibraryCard(m) {
+    const name = m.name || '';
+    const isInstalled = _localModels.some(l => l.name.split(':')[0] === name.split(':')[0]);
+    const tags = _modelTags(name);
+    const origin = _countryFlag(name);
+    const param = _paramLabel(m.details, name);
+    const size  = _sizeLabel(m.size);
+
+    const card = document.createElement('div');
+    card.className = 'model-card' + (isInstalled ? ' is-active' : '');
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'model-card-name';
+    if (origin) {
+      const img = document.createElement('img');
+      img.src = 'https://flagcdn.com/16x12/' + origin.code + '.png';
+      img.width = 16; img.height = 12;
+      img.alt = origin.country; img.title = origin.country;
+      img.className = 'model-flag';
+      nameEl.appendChild(img);
+      nameEl.appendChild(document.createTextNode(name));
+    } else {
+      nameEl.textContent = name;
+    }
+
+    const badges = document.createElement('div');
+    badges.className = 'model-badges';
+    if (isInstalled) { const b = document.createElement('span'); b.className = 'badge badge-installed'; b.textContent = '✓ Installed'; badges.appendChild(b); }
+    else { const b = document.createElement('span'); b.className = 'badge badge-size'; b.textContent = 'Available'; badges.appendChild(b); }
+    if (param) { const b = document.createElement('span'); b.className = 'badge badge-size'; b.textContent = param; badges.appendChild(b); }
+    tags.forEach(t => { const b = document.createElement('span'); b.className = 'badge ' + t.cls; b.textContent = t.label; badges.appendChild(b); });
+
+    const meta = document.createElement('div');
+    meta.className = 'model-card-meta';
+    const info = document.createElement('span');
+    const parts = [];
+    if (size) parts.push(size);
+    if (m.modified_at) {
+      try { parts.push(new Date(m.modified_at).toLocaleDateString()); } catch(e) {}
+    }
+    info.textContent = parts.join(' · ');
+    meta.appendChild(info);
+
+    card.appendChild(nameEl);
+    card.appendChild(badges);
+    card.appendChild(meta);
+    return card;
+  }
+
+  function _formatPulls(n) {
+    if (!n) return '';
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(0) + 'K';
+    return String(n);
+  }
+
+  function _renderModelsTab() {
+    if (!modelsList) return;
+    const q = (modelsSearch ? modelsSearch.value : '').toLowerCase().trim();
+
+    modelsList.innerHTML = '';
+
+    if (_modelsTab === 'local') {
+      const filtered = _localModels.filter(m => !q || m.name.toLowerCase().includes(q));
+      if (!filtered.length) {
+        modelsList.innerHTML = '<div class="models-placeholder">' + (q ? 'No local models match.' : 'No local models found.') + '</div>';
+        return;
+      }
+      filtered.forEach(m => modelsList.appendChild(_buildLocalCard(m)));
+    } else {
+      if (!_libraryLoaded) {
+        modelsList.innerHTML = '<div class="models-placeholder">Loading library…</div>';
+        return;
+      }
+      const filtered = _libraryModels.filter(m => !q || (m.name || '').toLowerCase().includes(q) || (m.description || '').toLowerCase().includes(q));
+      if (!filtered.length) {
+        modelsList.innerHTML = '<div class="models-placeholder">' + (q ? 'No library models match.' : 'Library unavailable.') + '</div>';
+        return;
+      }
+      filtered.forEach(m => modelsList.appendChild(_buildLibraryCard(m)));
+    }
+  }
+
+  async function _loadLibrary() {
+    if (!modelsList) return;
+    modelsList.innerHTML = '<div class="models-placeholder">Fetching from ollama.com…</div>';
+    try {
+      const q = modelsSearch ? modelsSearch.value : '';
+      const res = await fetch('/models/library?q=' + encodeURIComponent(q));
+      const data = await res.json();
+      _libraryModels = data.models || [];
+      _libraryLoaded = true;
+    } catch (e) {
+      _libraryModels = [];
+      _libraryLoaded = true;
+    }
+    _renderModelsTab();
+  }
+
+  if (modelsBtn) modelsBtn.addEventListener('click', openModelsPanel);
+  if (modelsClose) modelsClose.addEventListener('click', closeModelsPanel);
+  if (modelsPanel) modelsPanel.addEventListener('click', e => { if (e.target === modelsPanel) closeModelsPanel(); });
+
+  modelsTabs.forEach(tab => tab.addEventListener('click', function () {
+    _modelsTab = this.dataset.tab;
+    modelsTabs.forEach(t => t.classList.toggle('active', t.dataset.tab === _modelsTab));
+    if (_modelsTab === 'library' && !_libraryLoaded) {
+      _loadLibrary();
+    } else {
+      _renderModelsTab();
+    }
+  }));
+
+  if (modelsSearch) {
+    modelsSearch.addEventListener('input', () => {
+      if (_modelsTab === 'library' && !_libraryLoaded) return;
+      _renderModelsTab();
+    });
+    modelsSearch.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && _modelsTab === 'library') {
+        _libraryLoaded = false;
+        _loadLibrary();
+      }
     });
   }
 

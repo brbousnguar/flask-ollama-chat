@@ -277,6 +277,31 @@ def list_models():
         return jsonify({"error": str(e), "models": []}), 500
 
 
+@app.route("/models/library")
+@_auth_required
+def library_models():
+    """Proxy Ollama.com model search to avoid CORS issues."""
+    import urllib.parse
+    q = request.args.get("q", "")
+    try:
+        params = {"sort": "featured", "limit": "100"}
+        if q:
+            params["q"] = q
+        url = "https://ollama.com/api/tags?" + urllib.parse.urlencode(params)
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "Mozilla/5.0 (compatible; AI-Assistant/1.0)",
+                "Accept": "application/json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"models": [], "error": str(e)}), 200
+
+
 def _stream_chat(messages, model):
     """Generator that streams Ollama chat completion chunks as SSE."""
     app.logger.debug("Sending %d messages to model %s; first role: %s",
