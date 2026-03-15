@@ -9,4 +9,5 @@ services:
       - OLLAMA_API_KEY=ollama
     volumes:
       - ./data:/app/data
+      - ./system_prompt.txt:/app/system_prompt.txt:ro
     restart: unless-stopped

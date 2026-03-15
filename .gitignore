@@ -52,3 +52,6 @@ venv.bak/
 
 # Persisted chat threads (stored on host) — do not commit
 data/
+
+# Local system prompt — customize freely, never committed
+system_prompt.txt

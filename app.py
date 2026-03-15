@@ -34,6 +34,13 @@ client = OpenAI(
 
 DEFAULT_MODEL = os.environ.get("OLLAMA_MODEL", "gpt-oss:latest")
 
+# Optional system prompt loaded from an untracked local file
+_SYSTEM_PROMPT_PATH = os.path.join(os.path.dirname(__file__), "system_prompt.txt")
+_SYSTEM_PROMPT = None
+if os.path.exists(_SYSTEM_PROMPT_PATH):
+    with open(_SYSTEM_PROMPT_PATH, encoding="utf-8") as _f:
+        _SYSTEM_PROMPT = _f.read().strip() or None
+
 # Directory for storing chat threads: data/YYYY-MM-DD.json
 DATA_ROOT = os.path.join(os.path.dirname(__file__), "data")
 os.makedirs(DATA_ROOT, exist_ok=True)
@@ -272,6 +279,8 @@ def list_models():
 
 def _stream_chat(messages, model):
     """Generator that streams Ollama chat completion chunks as SSE."""
+    app.logger.debug("Sending %d messages to model %s; first role: %s",
+                     len(messages), model, messages[0]["role"] if messages else "none")
     try:
         stream = client.chat.completions.create(
             model=model,
@@ -298,6 +307,9 @@ def chat():
     messages = data["messages"]
     if not isinstance(messages, list):
         return jsonify({"error": "'messages' must be a list"}), 400
+
+    if _SYSTEM_PROMPT:
+        messages = [{"role": "system", "content": _SYSTEM_PROMPT}] + messages
 
     model = (data.get("model") or "").strip() or DEFAULT_MODEL
 

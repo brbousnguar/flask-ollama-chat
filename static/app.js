@@ -457,27 +457,7 @@
   }
 
   function startNewChat() {
-    // Create a new thread. Ask the user whether they want to include the
-    // last assistant reply as context (since including it silently can be
-    // surprising). Default: create an empty new chat.
-    let preview = null;
-    if (conversation && conversation.length) {
-      for (let i = conversation.length - 1; i >= 0; i--) {
-        if (conversation[i].role === 'assistant' && conversation[i].content) {
-          preview = conversation[i].content;
-          break;
-        }
-      }
-    }
-
-    let includeContext = false;
-    try {
-      if (preview) {
-        includeContext = window.confirm('Include the last assistant reply as context in the new chat?\n\nOK = include, Cancel = start empty');
-      }
-    } catch (e) { includeContext = false; }
-
-    const t = includeContext ? createThread({ title: 'Chat ' + (threads.length + 1), context: preview }) : createThread({ title: 'Chat ' + (threads.length + 1) });
+    const t = createThread({ title: 'Chat ' + (threads.length + 1) });
     // persist newly created thread
     saveThreads();
     input.focus();
