@@ -17,7 +17,6 @@
   const inputRow = document.querySelector('.input-row');
 
   let conversation = [];
-  let currentThreadId = null;
   let activeRequestController = null;
   let activeRequestId = null;
   let isGenerating = false;
@@ -27,51 +26,11 @@
   let _libraryModels = [];
   let _libraryLoaded = false;
 
-  function genId() {
-    return 't_' + Math.random().toString(36).slice(2, 9);
-  }
-
   function genRequestId() {
     try {
       if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
     } catch (e) {}
     return 'r_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
-  }
-
-  // ── Thread persistence (single thread, no history UI) ────────────────────
-
-  function saveThread() {
-    if (!currentThreadId) return;
-    fetch('/threads', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: currentThreadId,
-        title: 'Chat',
-        messages: conversation,
-        created_at: new Date().toISOString(),
-      }),
-    }).catch(() => {});
-  }
-
-  async function loadLatestThread() {
-    return fetch('/threads').then(async res => {
-      return res.json();
-    }).then(async data => {
-      if (!data || !data.days || !data.days.length) return false;
-      const latestDay = data.days[0];
-      if (!latestDay.threads || !latestDay.threads.length) return false;
-      // pick the most recent thread
-      const meta = latestDay.threads[latestDay.threads.length - 1];
-      try {
-        const r = await fetch(`/threads/${encodeURIComponent(latestDay.date)}/${encodeURIComponent(meta.id)}`);
-        if (!r.ok) return false;
-        const tdata = await r.json();
-        currentThreadId = tdata.id;
-        conversation = (tdata.messages || []).filter(m => m.role !== 'system');
-        return conversation.length > 0;
-      } catch (e) { return false; }
-    }).catch(() => false);
   }
 
   // ── Chat rendering ────────────────────────────────────────────────────────
@@ -297,10 +256,8 @@
   }
 
   function startNewChat() {
-    currentThreadId = genId();
     conversation = [];
     renderMessages();
-    saveThread();
     input.focus();
   }
 
@@ -462,7 +419,6 @@
       }
 
       conversation.push({ role: "assistant", content: fullContent });
-      saveThread();
       setStatus("");
     } catch (err) {
       stoppedByUser = err && err.name === "AbortError";
@@ -475,7 +431,6 @@
         if (!fullContent) messageEl.remove();
         if (fullContent) {
           conversation.push({ role: "assistant", content: fullContent });
-          saveThread();
         }
       }
     } finally {
@@ -850,11 +805,7 @@
   // ── Init ──────────────────────────────────────────────────────────────────
 
   async function initApp() {
-    const hasHistory = await loadLatestThread();
-    if (!hasHistory) {
-      currentThreadId = genId();
-      conversation = [];
-    }
+    conversation = [];
     renderMessages();
     await loadModels();
     setTimeout(() => { updateMessagesPadding(); ensureScrolled(); try { input.focus(); } catch (e) {} }, 120);
