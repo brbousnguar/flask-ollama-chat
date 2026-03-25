@@ -9,8 +9,3 @@ script = ""
 name = "Run"
 icon = "run"
 command = "docker compose up --build -d"
-
-[[actions]]
-name = "Run on Docker Compose"
-icon = "tool"
-command = "docker compose up --build-d"

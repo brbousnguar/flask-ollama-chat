@@ -650,9 +650,15 @@ body {
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
+  border-radius: 20px;
   outline: none;
   transition: border-color var(--transition), box-shadow var(--transition);
+  resize: none;
+  min-height: 44px;
+  max-height: 180px;
+  line-height: 1.45;
+  overflow-y: hidden;
+  field-sizing: content;
 }
 #user-input::placeholder { color: var(--text-subtle); }
 #user-input:focus {

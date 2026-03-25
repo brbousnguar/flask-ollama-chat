@@ -25,6 +25,7 @@
   let _localModels = [];
   let _libraryModels = [];
   let _libraryLoaded = false;
+  const MODEL_PREFERENCE_KEY = 'preferredModel';
 
   function genRequestId() {
     try {
@@ -92,6 +93,7 @@
   function _selectModelDropdown(name) {
     if (modelSelect) { modelSelect.value = name; }
     _updateDropdownLabel(name);
+    _savePreferredModel(name);
     // update active state in list
     if (modelDropdownList) {
       modelDropdownList.querySelectorAll('.model-dropdown-item').forEach(el => {
@@ -131,11 +133,8 @@
       modelDropdownList.appendChild(item);
     });
 
-    // select first by default
-    const firstName = typeof models[0] === 'string' ? models[0] : models[0].name;
-    modelSelect.value = firstName;
-    _updateDropdownLabel(firstName);
-    modelDropdownList.querySelector('.model-dropdown-item').classList.add('selected');
+    const preferredName = _resolvePreferredModel(models);
+    _selectModelDropdown(preferredName);
   }
 
   if (modelDropdownBtn) {
@@ -167,6 +166,27 @@
     }
   }
 
+  function _savePreferredModel(name) {
+    try {
+      localStorage.setItem(MODEL_PREFERENCE_KEY, name);
+    } catch (e) {}
+  }
+
+  function _loadPreferredModel() {
+    try {
+      return localStorage.getItem(MODEL_PREFERENCE_KEY) || "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function _resolvePreferredModel(models) {
+    const names = models.map(m => typeof m === 'string' ? m : (m.name || '')).filter(Boolean);
+    const preferred = _loadPreferredModel();
+    if (preferred && names.includes(preferred)) return preferred;
+    return names[0] || '';
+  }
+
   // ── Utilities ─────────────────────────────────────────────────────────────
 
   function updateMessagesPadding() {
@@ -175,6 +195,25 @@
       const h = inputRow.getBoundingClientRect().height;
       messagesEl.style.paddingBottom = Math.max(h + 12, 88) + 'px';
     } catch (e) {}
+  }
+
+  function resizeComposer() {
+    try {
+      if (!input) return;
+      input.style.height = 'auto';
+      const nextHeight = Math.min(input.scrollHeight, 180);
+      input.style.height = nextHeight + 'px';
+      input.style.overflowY = input.scrollHeight > 180 ? 'auto' : 'hidden';
+      updateMessagesPadding();
+    } catch (e) {}
+  }
+
+  function shouldSendOnEnter() {
+    try {
+      return !window.matchMedia('(pointer: coarse)').matches;
+    } catch (e) {
+      return true;
+    }
   }
 
   function ensureScrolled() {
@@ -341,6 +380,7 @@
     if (!text || isGenerating) return;
 
     input.value = "";
+    resizeComposer();
     addMessage("user", text);
     conversation.push({ role: "user", content: text });
 
@@ -438,6 +478,7 @@
       activeRequestId = null;
       setGeneratingState(false);
       showTyping(false);
+      resizeComposer();
       input.focus();
     }
   }
@@ -445,6 +486,13 @@
   // ── Event listeners ───────────────────────────────────────────────────────
 
   form.addEventListener("submit", e => { e.preventDefault(); sendMessage(); });
+  input.addEventListener("input", resizeComposer);
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey && shouldSendOnEnter()) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
 
   if (newChatBtn) newChatBtn.addEventListener("click", startNewChat);
   if (newChatBtnBottom) newChatBtnBottom.addEventListener("click", startNewChat);
@@ -808,7 +856,12 @@
     conversation = [];
     renderMessages();
     await loadModels();
-    setTimeout(() => { updateMessagesPadding(); ensureScrolled(); try { input.focus(); } catch (e) {} }, 120);
+    setTimeout(() => {
+      resizeComposer();
+      updateMessagesPadding();
+      ensureScrolled();
+      try { input.focus(); } catch (e) {}
+    }, 120);
   }
 
   async function init() {
@@ -857,8 +910,8 @@
     });
   }
 
-  window.addEventListener('resize', () => { updateMessagesPadding(); ensureScrolled(); });
+  window.addEventListener('resize', () => { resizeComposer(); updateMessagesPadding(); ensureScrolled(); });
   window.addEventListener('orientationchange', () => {
-    setTimeout(() => { updateMessagesPadding(); ensureScrolled(); }, 120);
+    setTimeout(() => { resizeComposer(); updateMessagesPadding(); ensureScrolled(); }, 120);
   });
 })();

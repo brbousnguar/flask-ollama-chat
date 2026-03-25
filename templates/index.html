@@ -61,13 +61,14 @@
 
       <form id="chat-form" class="input-row" aria-label="Send a message">
         <button type="button" id="new-chat-btn-bottom" class="new-chat-btn-bottom" aria-label="Start new chat">✚</button>
-        <input
+        <textarea
           id="user-input"
-          type="text"
           placeholder="Type a message..."
           autocomplete="off"
           aria-label="Message"
-        />
+          enterkeyhint="enter"
+          rows="1"
+        ></textarea>
         <button type="button" id="stop-btn" class="stop-btn" aria-label="Stop generating" hidden>
           <span class="stop-icon" aria-hidden="true">■</span>
         </button>
