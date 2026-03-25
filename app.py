@@ -37,7 +37,7 @@ DEFAULT_MODEL = os.environ.get("OLLAMA_MODEL", "gpt-oss:latest")
 # Optional system prompt loaded from an untracked local file
 _SYSTEM_PROMPT_PATH = os.path.join(os.path.dirname(__file__), "system_prompt.txt")
 _SYSTEM_PROMPT = None
-if os.path.exists(_SYSTEM_PROMPT_PATH):
+if os.path.isfile(_SYSTEM_PROMPT_PATH):
     with open(_SYSTEM_PROMPT_PATH, encoding="utf-8") as _f:
         _SYSTEM_PROMPT = _f.read().strip() or None
 
