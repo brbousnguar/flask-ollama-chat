@@ -520,6 +520,20 @@ body {
   animation: messageIn 0.2s ease;
 }
 
+.message-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.message-block.user {
+  align-items: flex-end;
+}
+
+.message-block.assistant {
+  align-items: flex-start;
+}
+
 @keyframes messageIn {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -547,12 +561,35 @@ body {
 }
 
 .message.error {
-  align-self: stretch;
   background: var(--error-bg);
   border: 1px solid rgba(220, 38, 38, 0.2);
   color: var(--error);
   padding: 0.75rem 1rem;
   border-radius: var(--radius-sm);
+  max-width: min(100%, 720px);
+}
+
+.message-actions {
+  display: inline-flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.message-action-btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 0.28rem 0.65rem;
+  font-size: 0.75rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.message-action-btn:hover {
+  color: var(--text);
+  background: var(--surface-elevated);
 }
 
 /* ─── Typing indicator ─────────────────────────────────────────────────── */

@@ -41,18 +41,66 @@
     if (emptyState) messagesEl.appendChild(emptyState);
     if (!conversation.length) { showEmptyState(true); return; }
     showEmptyState(false);
-    conversation.forEach(m => {
+    conversation.forEach((m, index) => {
       if (m.role === 'system') return;
-      const div = document.createElement('div');
-      div.className = 'message ' + (m.role === 'assistant' ? 'assistant' : 'user');
-      div.setAttribute('role', 'listitem');
-      try {
-        if (m.role === 'assistant') div.innerHTML = renderMessageContent(m.content);
-        else div.textContent = m.content;
-      } catch (e) { div.textContent = m.content; }
-      messagesEl.appendChild(div);
+      messagesEl.appendChild(createMessageNode(m.role, m.content, { index }));
     });
     scrollToBottom();
+  }
+
+  function canRewriteMessage(index) {
+    return (
+      index > 0 &&
+      conversation[index] &&
+      conversation[index].role === 'assistant' &&
+      conversation[index - 1] &&
+      conversation[index - 1].role === 'user'
+    );
+  }
+
+  function createMessageNode(role, content, options = {}) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'message-block ' + role;
+    wrapper.setAttribute('role', 'listitem');
+
+    const messageEl = document.createElement('div');
+    messageEl.className = 'message ' + role + (options.isError ? ' error' : '');
+
+    try {
+      if (role === 'assistant' && !options.isError) messageEl.innerHTML = renderMessageContent(content);
+      else messageEl.textContent = content;
+    } catch (e) {
+      messageEl.textContent = content;
+    }
+
+    wrapper.appendChild(messageEl);
+
+    if (role === 'assistant' && !options.isError) {
+      const actions = document.createElement('div');
+      actions.className = 'message-actions';
+
+      const copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'message-action-btn';
+      copyBtn.dataset.action = 'copy';
+      copyBtn.dataset.content = content;
+      copyBtn.textContent = 'Copy';
+      actions.appendChild(copyBtn);
+
+      if (typeof options.index === 'number' && canRewriteMessage(options.index)) {
+        const rewriteBtn = document.createElement('button');
+        rewriteBtn.type = 'button';
+        rewriteBtn.className = 'message-action-btn';
+        rewriteBtn.dataset.action = 'rewrite';
+        rewriteBtn.dataset.index = String(options.index);
+        rewriteBtn.textContent = 'Rewrite';
+        actions.appendChild(rewriteBtn);
+      }
+
+      wrapper.appendChild(actions);
+    }
+
+    return wrapper;
   }
 
   // ── Custom model dropdown ─────────────────────────────────────────────────
@@ -354,36 +402,55 @@
 
   function addMessage(role, content, isError = false) {
     showEmptyState(false);
-    const div = document.createElement("div");
-    div.className = "message " + (isError ? "error" : role);
-    div.setAttribute("role", "listitem");
-    div.textContent = content;
-    messagesEl.appendChild(div);
+    const node = createMessageNode(role, content, { isError });
+    messagesEl.appendChild(node);
     scrollToBottom();
-    return div;
+    return node;
   }
 
   function createStreamingMessage() {
     showEmptyState(false);
-    const div = document.createElement("div");
-    div.className = "message assistant";
-    div.setAttribute("role", "listitem");
-    messagesEl.appendChild(div);
+    const node = createMessageNode("assistant", "", {});
+    messagesEl.appendChild(node);
     scrollToBottom();
-    return div;
+    return {
+      wrapper: node,
+      content: node.querySelector(".message.assistant"),
+    };
   }
 
-  // ── Send ──────────────────────────────────────────────────────────────────
+  async function copyToClipboard(text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) {}
 
-  async function sendMessage() {
-    const text = input.value.trim();
-    if (!text || isGenerating) return;
+    try {
+      const temp = document.createElement('textarea');
+      temp.value = text;
+      temp.setAttribute('readonly', '');
+      temp.style.position = 'absolute';
+      temp.style.left = '-9999px';
+      document.body.appendChild(temp);
+      temp.select();
+      document.execCommand('copy');
+      document.body.removeChild(temp);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
 
-    input.value = "";
-    resizeComposer();
-    addMessage("user", text);
-    conversation.push({ role: "user", content: text });
+  async function rewriteAssistantMessage(index) {
+    if (isGenerating || !canRewriteMessage(index)) return;
+    conversation = conversation.slice(0, index);
+    renderMessages();
+    await generateAssistantReply();
+  }
 
+  async function generateAssistantReply() {
     const model = modelSelect ? modelSelect.value : "";
     if (!model) {
       addMessage("assistant", "Please select a model.", true);
@@ -398,7 +465,8 @@
     showTyping(true);
     setStatus("");
 
-    const messageEl = createStreamingMessage();
+    const streamingMessage = createStreamingMessage();
+    const messageEl = streamingMessage.content;
     let fullContent = "";
     let receivedFirstChunk = false;
     let stoppedByUser = false;
@@ -414,7 +482,7 @@
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         showTyping(false);
-        messageEl.remove();
+        streamingMessage.wrapper.remove();
         addMessage("assistant", err.error || "Request failed", true);
         setStatus("", "error");
         return;
@@ -439,7 +507,7 @@
             const data = JSON.parse(payload);
             if (data.error) {
               showTyping(false);
-              messageEl.remove();
+              streamingMessage.wrapper.remove();
               addMessage("assistant", data.error, true);
               setStatus("", "error");
               return;
@@ -459,18 +527,20 @@
       }
 
       conversation.push({ role: "assistant", content: fullContent });
+      renderMessages();
       setStatus("");
     } catch (err) {
       stoppedByUser = err && err.name === "AbortError";
       showTyping(false);
       if (!stoppedByUser) {
-        messageEl.remove();
+        streamingMessage.wrapper.remove();
         addMessage("assistant", "Network error: " + err.message, true);
         setStatus("", "error");
       } else {
-        if (!fullContent) messageEl.remove();
+        if (!fullContent) streamingMessage.wrapper.remove();
         if (fullContent) {
           conversation.push({ role: "assistant", content: fullContent });
+          renderMessages();
         }
       }
     } finally {
@@ -483,6 +553,19 @@
     }
   }
 
+  // ── Send ──────────────────────────────────────────────────────────────────
+
+  async function sendMessage() {
+    const text = input.value.trim();
+    if (!text || isGenerating) return;
+
+    input.value = "";
+    resizeComposer();
+    addMessage("user", text);
+    conversation.push({ role: "user", content: text });
+    await generateAssistantReply();
+  }
+
   // ── Event listeners ───────────────────────────────────────────────────────
 
   form.addEventListener("submit", e => { e.preventDefault(); sendMessage(); });
@@ -491,6 +574,21 @@
     if (e.key === "Enter" && !e.shiftKey && shouldSendOnEnter()) {
       e.preventDefault();
       sendMessage();
+    }
+  });
+  messagesEl.addEventListener("click", async e => {
+    const btn = e.target.closest(".message-action-btn");
+    if (!btn) return;
+
+    if (btn.dataset.action === "copy") {
+      const ok = await copyToClipboard(btn.dataset.content || "");
+      setStatus(ok ? "Copied response" : "Copy failed", ok ? "" : "error");
+      return;
+    }
+
+    if (btn.dataset.action === "rewrite") {
+      const index = Number(btn.dataset.index);
+      if (!Number.isNaN(index)) rewriteAssistantMessage(index);
     }
   });
 
