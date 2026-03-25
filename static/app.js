@@ -7,23 +7,16 @@
   const statusEl = document.getElementById("status");
   const sendBtn = document.getElementById("send-btn");
   const newChatBtn = document.getElementById("new-chat-btn");
+  const newChatBtnBottom = document.getElementById("new-chat-btn-bottom");
   const modelSelect        = document.getElementById("model-select");
   const modelDropdownBtn   = document.getElementById("model-dropdown-btn");
   const modelDropdownList  = document.getElementById("model-dropdown-list");
   const modelDropdownCurrent = document.getElementById("model-dropdown-current");
   let _dropdownOpen = false;
   const inputRow = document.querySelector('.input-row');
-  const authModal = document.getElementById('auth-modal');
-  const authError = document.getElementById('auth-error');
-  const registerForm = document.getElementById('register-form');
-  const loginForm = document.getElementById('login-form');
-  const userBox = document.getElementById('user-box');
-  const userName = document.getElementById('user-name');
-  const logoutBtn = document.getElementById('logout-btn');
 
   let conversation = [];
   let currentThreadId = null;
-  let currentUser = null;
 
   // shared state for models panel (populated by loadModels)
   let _localModels = [];
@@ -32,45 +25,6 @@
 
   function genId() {
     return 't_' + Math.random().toString(36).slice(2, 9);
-  }
-
-  // ── Auth ─────────────────────────────────────────────────────────────────
-
-  function setAuthError(message) {
-    if (!authError) return;
-    if (!message) { authError.hidden = true; authError.textContent = ''; return; }
-    authError.hidden = false;
-    authError.textContent = message;
-  }
-
-  function toggleAuthModal(show) {
-    if (!authModal) return;
-    authModal.setAttribute('aria-hidden', show ? 'false' : 'true');
-  }
-
-  function updateUserUi() {
-    if (!userBox || !userName) return;
-    if (!currentUser) { userBox.hidden = true; userName.textContent = ''; return; }
-    userName.textContent = currentUser.name;
-    userBox.hidden = false;
-  }
-
-  async function getCurrentUser() {
-    try {
-      const res = await fetch('/auth/me');
-      const data = await res.json();
-      if (data && data.authenticated && data.user) {
-        currentUser = data.user;
-        updateUserUi();
-        toggleAuthModal(false);
-        setAuthError('');
-        return true;
-      }
-    } catch (e) {}
-    currentUser = null;
-    updateUserUi();
-    toggleAuthModal(true);
-    return false;
   }
 
   // ── Thread persistence (single thread, no history UI) ────────────────────
@@ -86,18 +40,11 @@
         messages: conversation,
         created_at: new Date().toISOString(),
       }),
-    }).then(res => {
-      if (res.status === 401) {
-        currentUser = null;
-        updateUserUi();
-        toggleAuthModal(true);
-      }
     }).catch(() => {});
   }
 
   async function loadLatestThread() {
     return fetch('/threads').then(async res => {
-      if (res.status === 401) { toggleAuthModal(true); return false; }
       return res.json();
     }).then(async data => {
       if (!data || !data.days || !data.days.length) return false;
@@ -240,9 +187,6 @@
   async function loadModels() {
     try {
       const res = await fetch("/models");
-      if (res.status === 401) {
-        currentUser = null; updateUserUi(); toggleAuthModal(true); return;
-      }
       const data = await res.json();
       const models = data.models || [];
       _populateModelDropdown(models);
@@ -421,7 +365,6 @@
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        if (res.status === 401) { currentUser = null; updateUserUi(); toggleAuthModal(true); }
         messageEl.remove();
         addMessage("assistant", err.error || "Request failed", true);
         setStatus("", "error");
@@ -479,18 +422,7 @@
   form.addEventListener("submit", e => { e.preventDefault(); sendMessage(); });
 
   if (newChatBtn) newChatBtn.addEventListener("click", startNewChat);
-
-  if (logoutBtn) {
-    logoutBtn.addEventListener('click', async function () {
-      await fetch('/auth/logout', { method: 'POST' }).catch(() => {});
-      conversation = [];
-      currentThreadId = null;
-      currentUser = null;
-      updateUserUi();
-      renderMessages();
-      toggleAuthModal(true);
-    });
-  }
+  if (newChatBtnBottom) newChatBtnBottom.addEventListener("click", startNewChat);
 
   // ── Models panel ─────────────────────────────────────────────────────────
 
@@ -858,56 +790,7 @@
   }
 
   async function init() {
-    const authenticated = await getCurrentUser();
-    if (!authenticated) return;
     await initApp();
-  }
-
-  if (registerForm) {
-    registerForm.addEventListener('submit', async function (e) {
-      e.preventDefault();
-      setAuthError('');
-      const name = document.getElementById('register-name').value.trim();
-      const email = document.getElementById('register-email').value.trim();
-      const password = document.getElementById('register-password').value;
-      try {
-        const res = await fetch('/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, password }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) { setAuthError(data.error || 'Unable to create account'); return; }
-        currentUser = data.user || null;
-        updateUserUi();
-        toggleAuthModal(false);
-        conversation = []; currentThreadId = null;
-        await initApp();
-      } catch (err) { setAuthError('Network error while creating account'); }
-    });
-  }
-
-  if (loginForm) {
-    loginForm.addEventListener('submit', async function (e) {
-      e.preventDefault();
-      setAuthError('');
-      const email = document.getElementById('login-email').value.trim();
-      const password = document.getElementById('login-password').value;
-      try {
-        const res = await fetch('/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) { setAuthError(data.error || 'Unable to sign in'); return; }
-        currentUser = data.user || null;
-        updateUserUi();
-        toggleAuthModal(false);
-        conversation = []; currentThreadId = null;
-        await initApp();
-      } catch (err) { setAuthError('Network error while signing in'); }
-    });
   }
 
   init();

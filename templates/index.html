@@ -32,10 +32,6 @@
             <div class="model-dropdown-list" id="model-dropdown-list" role="listbox" hidden></div>
           </div>
           <select id="model-select" hidden aria-hidden="true"></select>
-          <div id="user-box" class="user-box" hidden>
-            <span id="user-name" class="user-name"></span>
-            <button type="button" id="logout-btn" class="logout-btn" aria-label="Logout">Logout</button>
-          </div>
           <button type="button" id="models-btn" class="models-btn" aria-label="Browse models">Models</button>
           <button type="button" id="new-chat-btn" class="new-chat-btn" aria-label="Start new chat">New chat</button>
           <button id="install-btn" class="install-btn" aria-label="Install app" title="Install app" hidden>Install</button>
@@ -61,6 +57,7 @@
       </div>
 
       <form id="chat-form" class="input-row" aria-label="Send a message">
+        <button type="button" id="new-chat-btn-bottom" class="new-chat-btn-bottom" aria-label="Start new chat">✚</button>
         <input
           id="user-input"
           type="text"
@@ -138,29 +135,6 @@
     </div>
   </div>
 
-  <div id="auth-modal" class="auth-modal" aria-hidden="true">
-    <div class="auth-card">
-      <h2>Welcome</h2>
-      <p class="auth-subtitle">Create an account or sign in to access your own chat sessions.</p>
-      <p id="auth-error" class="auth-error" hidden></p>
-
-      <form id="register-form" class="auth-form">
-        <h3>Create account</h3>
-        <input id="register-name" type="text" placeholder="Name" autocomplete="name" required>
-        <input id="register-email" type="email" placeholder="Email" autocomplete="email" required>
-        <input id="register-password" type="password" placeholder="Password (min 8 chars)" autocomplete="new-password" minlength="8" required>
-        <button type="submit">Create account</button>
-      </form>
-
-      <form id="login-form" class="auth-form">
-        <h3>Sign in</h3>
-        <input id="login-email" type="email" placeholder="Email" autocomplete="email" required>
-        <input id="login-password" type="password" placeholder="Password" autocomplete="current-password" required>
-        <button type="submit">Sign in</button>
-      </form>
-    </div>
-  </div>
-
-  <script src="/static/app.js?v=8"></script>
+  <script src="/static/app.js?v=11"></script>
 </body>
 </html>
