@@ -304,6 +304,7 @@
 
   function showTyping(show) {
     typingIndicator.hidden = !show;
+    typingIndicator.setAttribute("aria-hidden", show ? "false" : "true");
     if (show) scrollToBottom();
   }
 
@@ -353,8 +354,8 @@
     setStatus("");
 
     const messageEl = createStreamingMessage();
-    showTyping(false);
     let fullContent = "";
+    let receivedFirstChunk = false;
 
     try {
       const res = await fetch("/chat", {
@@ -365,6 +366,7 @@
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
+        showTyping(false);
         messageEl.remove();
         addMessage("assistant", err.error || "Request failed", true);
         setStatus("", "error");
@@ -389,12 +391,17 @@
           try {
             const data = JSON.parse(payload);
             if (data.error) {
+              showTyping(false);
               messageEl.remove();
               addMessage("assistant", data.error, true);
               setStatus("", "error");
               return;
             }
             if (data.content) {
+              if (!receivedFirstChunk) {
+                receivedFirstChunk = true;
+                showTyping(false);
+              }
               fullContent += data.content;
               try { messageEl.innerHTML = renderMessageContent(fullContent); }
               catch (e) { messageEl.textContent = fullContent; }
@@ -408,10 +415,12 @@
       saveThread();
       setStatus("");
     } catch (err) {
+      showTyping(false);
       messageEl.remove();
       addMessage("assistant", "Network error: " + err.message, true);
       setStatus("", "error");
     } finally {
+      showTyping(false);
       sendBtn.disabled = false;
       input.focus();
     }
