@@ -732,6 +732,15 @@ body {
   .model-dropdown-btn { font-size: 0.8125rem; padding: 0.35rem 0.6rem; max-width: 160px; }
   .header-badge { font-size: 0.9375rem; }
 
+  .chat-container .typing-indicator {
+    position: fixed;
+    left: 0.875rem;
+    bottom: calc(env(safe-area-inset-bottom, 12px) + 5.8rem);
+    z-index: 5;
+    margin: 0;
+    max-width: calc(100vw - 1.75rem);
+  }
+
   .chat-container .input-row {
     position: fixed;
     left: 0; right: 0; bottom: 0;
@@ -743,7 +752,7 @@ body {
     box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
     backdrop-filter: blur(8px);
   }
-  .messages { padding-bottom: calc(88px + env(safe-area-inset-bottom, 12px)); }
+  .messages { padding-bottom: calc(148px + env(safe-area-inset-bottom, 12px)); }
   #user-input { padding: 0.875rem 1rem; font-size: 1rem; }
   .new-chat-btn-bottom { width: 48px; height: 48px; }
   .stop-btn { width: 48px; height: 48px; }
