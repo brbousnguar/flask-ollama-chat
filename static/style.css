@@ -855,9 +855,40 @@ body {
   font-size: 0.875rem;
   margin: 0.5rem 0;
   line-height: 1.55;
+  position: relative;
+}
+.message .md-code-lang {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(232, 229, 224, 0.72);
+  margin-bottom: 0.55rem;
 }
 .message .md-ul { padding-left: 1.25rem; margin: 0.4rem 0; }
 .message .md-ul li { margin: 0.25rem 0; }
+.message .md-ol { padding-left: 1.35rem; margin: 0.4rem 0; }
+.message .md-ol li { margin: 0.25rem 0; }
+.message .md-link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.14em;
+  word-break: break-all;
+}
+.message .md-link:hover {
+  color: var(--accent-hover);
+}
+.message .md-blockquote {
+  margin: 0.6rem 0;
+  padding: 0.1rem 0 0.1rem 0.9rem;
+  border-left: 3px solid var(--border);
+  color: var(--text-muted);
+}
+.message .md-hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 0.85rem 0;
+}
 .md-table-wrap { overflow: auto; margin: 0.5rem 0; }
 .md-table { border-collapse: collapse; width: 100%; min-width: 360px; }
 .md-table th, .md-table td {
@@ -1056,6 +1087,65 @@ body {
   font-weight: 400;
 }
 
+.models-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1.5rem 0;
+  flex-wrap: wrap;
+}
+
+.models-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.models-filter {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.75rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.models-filter:hover {
+  color: var(--text);
+  background: var(--surface-elevated);
+}
+
+.models-filter.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.models-sort-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.models-sort {
+  padding: 0.45rem 0.7rem;
+  font-size: 0.8125rem;
+  font-family: inherit;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+}
+
 .models-list {
   padding: 1rem 1.5rem 1.5rem;
   overflow-y: auto;
@@ -1134,6 +1224,8 @@ body {
   text-transform: uppercase;
 }
 .badge-installed  { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+.badge-current    { background: #ffedd5; color: #9a3412; border-color: #fed7aa; }
+.badge-preferred  { background: #fef3c7; color: #92400e; border-color: #fde68a; }
 .badge-vision     { background: #ede9fe; color: #5b21b6; border-color: #ddd6fe; }
 .badge-code       { background: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
 .badge-math       { background: #fef9c3; color: #854d0e; border-color: #fef08a; }
@@ -1143,6 +1235,8 @@ body {
 
 /* dark theme badge overrides */
 .theme-dark .badge-installed { background: rgba(22,101,52,0.25); color: #86efac; border-color: rgba(134,239,172,0.3); }
+.theme-dark .badge-current   { background: rgba(154,52,18,0.25); color: #fdba74; border-color: rgba(253,186,116,0.3); }
+.theme-dark .badge-preferred { background: rgba(146,64,14,0.22); color: #fcd34d; border-color: rgba(252,211,77,0.3); }
 .theme-dark .badge-vision    { background: rgba(91,33,182,0.25); color: #c4b5fd; border-color: rgba(196,181,253,0.3); }
 .theme-dark .badge-code      { background: rgba(30,64,175,0.25); color: #93c5fd; border-color: rgba(147,197,253,0.3); }
 .theme-dark .badge-math      { background: rgba(133,77,14,0.25); color: #fde68a; border-color: rgba(253,230,138,0.3); }
@@ -1180,6 +1274,9 @@ body {
 @media (max-width: 600px) {
   .models-panel { padding: 0; align-items: flex-end; }
   .models-sheet { border-radius: 16px 16px 0 0; max-height: 90vh; }
+  .models-toolbar { padding: 0.75rem 1rem 0; align-items: stretch; }
+  .models-sort-wrap { width: 100%; justify-content: space-between; }
+  .models-sort { flex: 1; }
   .models-list { grid-template-columns: 1fr; max-height: 60vh; }
   .models-search { width: 160px; }
 }

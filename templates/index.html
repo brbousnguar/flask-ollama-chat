@@ -98,6 +98,24 @@
         <button class="models-tab active" data-tab="local" role="tab">Local <span id="local-count" class="tab-count"></span></button>
         <button class="models-tab" data-tab="library" role="tab">Library <span class="tab-hint">ollama.com</span></button>
       </div>
+      <div class="models-toolbar">
+        <div class="models-filters" id="models-filters" role="toolbar" aria-label="Model filters">
+          <button type="button" class="models-filter active" data-filter="all">All</button>
+          <button type="button" class="models-filter" data-filter="code">Code</button>
+          <button type="button" class="models-filter" data-filter="vision">Vision</button>
+          <button type="button" class="models-filter" data-filter="instruct">Chat</button>
+          <button type="button" class="models-filter" data-filter="light">Light</button>
+        </div>
+        <label class="models-sort-wrap" for="models-sort">
+          <span>Sort</span>
+          <select id="models-sort" class="models-sort">
+            <option value="recommended">Recommended</option>
+            <option value="name">Name</option>
+            <option value="size-asc">Size: small first</option>
+            <option value="size-desc">Size: large first</option>
+          </select>
+        </label>
+      </div>
       <div id="models-list" class="models-list" role="tabpanel"></div>
     </div>
   </div>

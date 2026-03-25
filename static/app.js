@@ -149,6 +149,7 @@
       });
     }
     _closeModelDropdown();
+    _renderModelsTab();
   }
 
   function _populateModelDropdown(models) {
@@ -272,19 +273,41 @@
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  function escapeAttribute(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
   function renderMessageContent(raw) {
     if (!raw) return '';
     let text = raw.replace(/<br\s*\/?\s*>/gi, '\n').replace(/\r\n/g, '\n');
     text = escapeHtml(text);
 
-    text = text.replace(/```([\s\S]*?)```/g, (_, code) =>
-      '<pre class="md-code"><code>' + escapeHtml(code) + '</code></pre>');
+    text = text.replace(/```([^\n`]*)\n?([\s\S]*?)```/g, (_, language, code) => {
+      const lang = (language || '').trim();
+      const langAttr = lang ? ' data-language="' + escapeAttribute(lang) + '"' : '';
+      const langLabel = lang ? '<div class="md-code-lang">' + escapeHtml(lang) + '</div>' : '';
+      return '<pre class="md-code"' + langAttr + '>' + langLabel + '<code>' + code + '</code></pre>';
+    });
     text = text.replace(/`([^`]+?)`/g, (_, code) =>
-      '<code class="md-inline-code">' + escapeHtml(code) + '</code>');
+      '<code class="md-inline-code">' + code + '</code>');
+
+    text = text.replace(
+      /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+      (_, label, href) => '<a class="md-link" href="' + escapeAttribute(href) + '" target="_blank" rel="noopener noreferrer">' + label + '</a>'
+    );
+    text = text.replace(
+      /(^|[\s(])(https?:\/\/[^\s<]+)/g,
+      (_, prefix, href) => prefix + '<a class="md-link" href="' + escapeAttribute(href) + '" target="_blank" rel="noopener noreferrer">' + href + '</a>'
+    );
 
     text = text.replace(/^###\s*(.+)$/gm, '<h3 class="md-h3">$1</h3>');
     text = text.replace(/^##\s*(.+)$/gm, '<h4 class="md-h4">$1</h4>');
     text = text.replace(/^#\s*(.+)$/gm, '<h2 class="md-h2">$1</h2>');
+    text = text.replace(/^\s*---+\s*$/gm, '<hr class="md-hr">');
     text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
 
@@ -330,14 +353,26 @@
       text = outLines.join('\n');
     }
 
+    text = text.replace(/(^|\n)(>\s?.+(\n>\s?.+)*)/g, function(_, pre, quoteBlock) {
+      const content = quoteBlock
+        .split('\n')
+        .map(line => line.replace(/^>\s?/, ''))
+        .join('<br>');
+      return (pre || '') + '<blockquote class="md-blockquote">' + content + '</blockquote>';
+    });
+
     text = text.replace(/(^|\n)([ \t]*[-\*] .+(\n[ \t]*[-\*] .+)*)/g, function(_, pre, listBlock) {
       const items = listBlock.trim().split('\n').map(l => l.replace(/^[-\*]\s?/, ''));
       return (pre || '') + '<ul class="md-ul">' + items.map(i => '<li>' + i + '</li>').join('') + '</ul>';
     });
+    text = text.replace(/(^|\n)([ \t]*\d+\. .+(\n[ \t]*\d+\. .+)*)/g, function(_, pre, listBlock) {
+      const items = listBlock.trim().split('\n').map(l => l.replace(/^\d+\.\s?/, ''));
+      return (pre || '') + '<ol class="md-ol">' + items.map(i => '<li>' + i + '</li>').join('') + '</ol>';
+    });
 
     const parts = text.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
     return parts.map(p => {
-      if (/^<(h2|h3|h4|pre|div|ul|table)/.test(p)) return p;
+      if (/^<(h2|h3|h4|pre|div|ul|ol|table|blockquote|hr)/.test(p)) return p;
       return '<p>' + p.replace(/\n/g, '<br>') + '</p>';
     }).join('\n');
   }
@@ -605,8 +640,11 @@
   const modelsList   = document.getElementById('models-list');
   const localCount   = document.getElementById('local-count');
   const modelsTabs   = document.querySelectorAll('.models-tab');
+  const modelsSort   = document.getElementById('models-sort');
+  const modelFilters = document.querySelectorAll('.models-filter');
 
   let _modelsTab = 'local';
+  let _modelsFilter = 'all';
 
   function openModelsPanel() {
     if (!modelsPanel) return;
@@ -696,6 +734,7 @@
 
   function _buildLocalCard(m) {
     const isActive = m.name === (modelSelect ? modelSelect.value : '');
+    const isPreferred = m.name === _loadPreferredModel();
     const tags = _modelTags(m.name);
     const origin = _countryFlag(m.name);
     const param = _paramLabel(m.details, m.name);
@@ -725,8 +764,20 @@
     instBadge.className = 'badge badge-installed';
     instBadge.textContent = '✓ Installed';
     badges.appendChild(instBadge);
+    if (isActive) { const b = document.createElement('span'); b.className = 'badge badge-current'; b.textContent = 'Current'; badges.appendChild(b); }
+    if (isPreferred && !isActive) { const b = document.createElement('span'); b.className = 'badge badge-preferred'; b.textContent = 'Preferred'; badges.appendChild(b); }
     if (param) { const b = document.createElement('span'); b.className = 'badge badge-size'; b.textContent = param; badges.appendChild(b); }
     tags.forEach(t => { const b = document.createElement('span'); b.className = 'badge ' + t.cls; b.textContent = t.label; badges.appendChild(b); });
+
+    if (origin) {
+      const desc = document.createElement('div');
+      desc.className = 'model-card-desc';
+      desc.textContent = origin.country;
+      card.appendChild(nameEl);
+      card.appendChild(desc);
+    } else {
+      card.appendChild(nameEl);
+    }
 
     const meta = document.createElement('div');
     meta.className = 'model-card-meta';
@@ -748,7 +799,6 @@
 
     meta.appendChild(info);
     meta.appendChild(useBtn);
-    card.appendChild(nameEl);
     card.appendChild(badges);
     card.appendChild(meta);
     return card;
@@ -757,6 +807,7 @@
   function _buildLibraryCard(m) {
     const name = m.name || '';
     const isInstalled = _localModels.some(l => l.name.split(':')[0] === name.split(':')[0]);
+    const isPreferred = name === _loadPreferredModel();
     const tags = _modelTags(name);
     const origin = _countryFlag(name);
     const param = _paramLabel(m.details, name);
@@ -783,8 +834,19 @@
     badges.className = 'model-badges';
     if (isInstalled) { const b = document.createElement('span'); b.className = 'badge badge-installed'; b.textContent = '✓ Installed'; badges.appendChild(b); }
     else { const b = document.createElement('span'); b.className = 'badge badge-size'; b.textContent = 'Available'; badges.appendChild(b); }
+    if (isPreferred) { const b = document.createElement('span'); b.className = 'badge badge-preferred'; b.textContent = 'Preferred'; badges.appendChild(b); }
     if (param) { const b = document.createElement('span'); b.className = 'badge badge-size'; b.textContent = param; badges.appendChild(b); }
     tags.forEach(t => { const b = document.createElement('span'); b.className = 'badge ' + t.cls; b.textContent = t.label; badges.appendChild(b); });
+
+    if (origin || m.description) {
+      const desc = document.createElement('div');
+      desc.className = 'model-card-desc';
+      desc.textContent = [origin ? origin.country : '', m.description || ''].filter(Boolean).join(' • ');
+      card.appendChild(nameEl);
+      card.appendChild(desc);
+    } else {
+      card.appendChild(nameEl);
+    }
 
     const meta = document.createElement('div');
     meta.className = 'model-card-meta';
@@ -797,7 +859,6 @@
     info.textContent = parts.join(' · ');
     meta.appendChild(info);
 
-    card.appendChild(nameEl);
     card.appendChild(badges);
     card.appendChild(meta);
     return card;
@@ -810,6 +871,60 @@
     return String(n);
   }
 
+  function _matchesModelFilter(model) {
+    if (_modelsFilter === 'all') return true;
+    const name = model.name || '';
+    const tags = _modelTags(name).map(t => t.label.toLowerCase());
+    if (_modelsFilter === 'light') {
+      const bytes = Number(model.size || 0);
+      const params = _paramLabel(model.details, name);
+      if (bytes && bytes <= 8e9) return true;
+      return !!(params && parseFloat(params) <= 8);
+    }
+    if (_modelsFilter === 'instruct') return tags.includes('instruct');
+    return tags.includes(_modelsFilter);
+  }
+
+  function _sortModels(models) {
+    const sorted = models.slice();
+    const activeName = modelSelect ? modelSelect.value : '';
+    const preferredName = _loadPreferredModel();
+    const sortMode = modelsSort ? modelsSort.value : 'recommended';
+
+    if (sortMode === 'name') {
+      sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      return sorted;
+    }
+
+    if (sortMode === 'size-asc') {
+      sorted.sort((a, b) => Number(a.size || Number.MAX_SAFE_INTEGER) - Number(b.size || Number.MAX_SAFE_INTEGER));
+      return sorted;
+    }
+
+    if (sortMode === 'size-desc') {
+      sorted.sort((a, b) => Number(b.size || 0) - Number(a.size || 0));
+      return sorted;
+    }
+
+    if (_modelsTab === 'local') {
+      sorted.sort((a, b) => {
+        const scoreA = (a.name === activeName ? 4 : 0) + (a.name === preferredName ? 2 : 0);
+        const scoreB = (b.name === activeName ? 4 : 0) + (b.name === preferredName ? 2 : 0);
+        if (scoreA !== scoreB) return scoreB - scoreA;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+      return sorted;
+    }
+
+    sorted.sort((a, b) => {
+      const installedA = _localModels.some(l => l.name.split(':')[0] === (a.name || '').split(':')[0]) ? 1 : 0;
+      const installedB = _localModels.some(l => l.name.split(':')[0] === (b.name || '').split(':')[0]) ? 1 : 0;
+      if (installedA !== installedB) return installedB - installedA;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+    return sorted;
+  }
+
   function _renderModelsTab() {
     if (!modelsList) return;
     const q = (modelsSearch ? modelsSearch.value : '').toLowerCase().trim();
@@ -817,9 +932,12 @@
     modelsList.innerHTML = '';
 
     if (_modelsTab === 'local') {
-      const filtered = _localModels.filter(m => !q || m.name.toLowerCase().includes(q));
+      const filtered = _sortModels(_localModels.filter(m => {
+        const haystack = [m.name || '', _countryFlag(m.name || '')?.country || ''].join(' ').toLowerCase();
+        return (!q || haystack.includes(q)) && _matchesModelFilter(m);
+      }));
       if (!filtered.length) {
-        modelsList.innerHTML = '<div class="models-placeholder">' + (q ? 'No local models match.' : 'No local models found.') + '</div>';
+        modelsList.innerHTML = '<div class="models-placeholder">' + ((q || _modelsFilter !== 'all') ? 'No local models match these filters.' : 'No local models found.') + '</div>';
         return;
       }
       filtered.forEach(m => modelsList.appendChild(_buildLocalCard(m)));
@@ -828,9 +946,12 @@
         modelsList.innerHTML = '<div class="models-placeholder">Loading library…</div>';
         return;
       }
-      const filtered = _libraryModels.filter(m => !q || (m.name || '').toLowerCase().includes(q) || (m.description || '').toLowerCase().includes(q));
+      const filtered = _sortModels(_libraryModels.filter(m => {
+        const haystack = [m.name || '', m.description || '', _countryFlag(m.name || '')?.country || ''].join(' ').toLowerCase();
+        return (!q || haystack.includes(q)) && _matchesModelFilter(m);
+      }));
       if (!filtered.length) {
-        modelsList.innerHTML = '<div class="models-placeholder">' + (q ? 'No library models match.' : 'Library unavailable.') + '</div>';
+        modelsList.innerHTML = '<div class="models-placeholder">' + ((q || _modelsFilter !== 'all') ? 'No library models match these filters.' : 'Library unavailable.') + '</div>';
         return;
       }
       filtered.forEach(m => modelsList.appendChild(_buildLibraryCard(m)));
@@ -879,6 +1000,16 @@
       }
     });
   }
+
+  if (modelsSort) {
+    modelsSort.addEventListener('change', _renderModelsTab);
+  }
+
+  modelFilters.forEach(filterBtn => filterBtn.addEventListener('click', function () {
+    _modelsFilter = this.dataset.filter || 'all';
+    modelFilters.forEach(btn => btn.classList.toggle('active', btn === this));
+    _renderModelsTab();
+  }));
 
   // ── Accessibility ─────────────────────────────────────────────────────────
 
