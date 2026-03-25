@@ -6,6 +6,7 @@
   const typingIndicator = document.getElementById("typing-indicator");
   const statusEl = document.getElementById("status");
   const sendBtn = document.getElementById("send-btn");
+  const stopBtn = document.getElementById("stop-btn");
   const newChatBtn = document.getElementById("new-chat-btn");
   const newChatBtnBottom = document.getElementById("new-chat-btn-bottom");
   const modelSelect        = document.getElementById("model-select");
@@ -17,6 +18,9 @@
 
   let conversation = [];
   let currentThreadId = null;
+  let activeRequestController = null;
+  let activeRequestId = null;
+  let isGenerating = false;
 
   // shared state for models panel (populated by loadModels)
   let _localModels = [];
@@ -25,6 +29,13 @@
 
   function genId() {
     return 't_' + Math.random().toString(36).slice(2, 9);
+  }
+
+  function genRequestId() {
+    try {
+      if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+    } catch (e) {}
+    return 'r_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
   }
 
   // ── Thread persistence (single thread, no history UI) ────────────────────
@@ -308,6 +319,39 @@
     if (show) scrollToBottom();
   }
 
+  function setGeneratingState(generating) {
+    isGenerating = generating;
+    sendBtn.hidden = generating;
+    stopBtn.hidden = !generating;
+    input.disabled = generating;
+    if (newChatBtn) newChatBtn.disabled = generating;
+    if (newChatBtnBottom) newChatBtnBottom.disabled = generating;
+  }
+
+  async function stopGeneration() {
+    if (!isGenerating) return;
+
+    const requestId = activeRequestId;
+
+    try {
+      if (activeRequestController) activeRequestController.abort();
+    } catch (e) {}
+
+    activeRequestController = null;
+    activeRequestId = null;
+    setGeneratingState(false);
+    showTyping(false);
+    setStatus("Stopped");
+
+    if (requestId) {
+      fetch("/chat/stop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ request_id: requestId }),
+      }).catch(() => {});
+    }
+  }
+
   function scrollToBottom() {
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
@@ -337,7 +381,7 @@
 
   async function sendMessage() {
     const text = input.value.trim();
-    if (!text) return;
+    if (!text || isGenerating) return;
 
     input.value = "";
     addMessage("user", text);
@@ -349,19 +393,25 @@
       return;
     }
 
-    sendBtn.disabled = true;
+    const requestController = new AbortController();
+    const requestId = genRequestId();
+    activeRequestController = requestController;
+    activeRequestId = requestId;
+    setGeneratingState(true);
     showTyping(true);
     setStatus("");
 
     const messageEl = createStreamingMessage();
     let fullContent = "";
     let receivedFirstChunk = false;
+    let stoppedByUser = false;
 
     try {
       const res = await fetch("/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: conversation, model }),
+        body: JSON.stringify({ messages: conversation, model, request_id: requestId }),
+        signal: requestController.signal,
       });
 
       if (!res.ok) {
@@ -415,13 +465,24 @@
       saveThread();
       setStatus("");
     } catch (err) {
+      stoppedByUser = err && err.name === "AbortError";
       showTyping(false);
-      messageEl.remove();
-      addMessage("assistant", "Network error: " + err.message, true);
-      setStatus("", "error");
+      if (!stoppedByUser) {
+        messageEl.remove();
+        addMessage("assistant", "Network error: " + err.message, true);
+        setStatus("", "error");
+      } else {
+        if (!fullContent) messageEl.remove();
+        if (fullContent) {
+          conversation.push({ role: "assistant", content: fullContent });
+          saveThread();
+        }
+      }
     } finally {
+      activeRequestController = null;
+      activeRequestId = null;
+      setGeneratingState(false);
       showTyping(false);
-      sendBtn.disabled = false;
       input.focus();
     }
   }
@@ -432,6 +493,7 @@
 
   if (newChatBtn) newChatBtn.addEventListener("click", startNewChat);
   if (newChatBtnBottom) newChatBtnBottom.addEventListener("click", startNewChat);
+  if (stopBtn) stopBtn.addEventListener("click", stopGeneration);
 
   // ── Models panel ─────────────────────────────────────────────────────────
 

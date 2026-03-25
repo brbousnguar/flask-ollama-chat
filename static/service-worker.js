@@ -1,8 +1,8 @@
-const CACHE_NAME = 'ai-chat-v11';
+const CACHE_NAME = 'ai-chat-v12';
 const APP_PREFIX = 'ai-chat-';
 const ASSETS_TO_CACHE = [
   '/static/style.css?v=8',
-  '/static/app.js?v=12',
+  '/static/app.js?v=13',
   '/static/manifest.json',
   '/static/icons/icon-192.svg',
   '/static/icons/icon-512.svg'

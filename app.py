@@ -3,7 +3,9 @@ Flask AI assistant using local Ollama.
 """
 import json
 import os
+import threading
 import urllib.request
+import uuid
 from datetime import datetime
 
 from flask import (
@@ -28,6 +30,8 @@ client = OpenAI(
 )
 
 DEFAULT_MODEL = os.environ.get("OLLAMA_MODEL", "gpt-oss:latest")
+_ACTIVE_STREAMS = {}
+_ACTIVE_STREAMS_LOCK = threading.Lock()
 
 # Optional system prompt loaded from an untracked local file
 _SYSTEM_PROMPT_PATH = os.path.join(os.path.dirname(__file__), "system_prompt.txt")
@@ -159,16 +163,40 @@ def library_models():
         return jsonify({"models": [], "error": str(e)}), 200
 
 
-def _stream_chat(messages, model):
+def _register_stream(request_id, stream):
+    with _ACTIVE_STREAMS_LOCK:
+        _ACTIVE_STREAMS[request_id] = stream
+
+
+def _unregister_stream(request_id):
+    with _ACTIVE_STREAMS_LOCK:
+        _ACTIVE_STREAMS.pop(request_id, None)
+
+
+def _stop_stream(request_id):
+    with _ACTIVE_STREAMS_LOCK:
+        stream = _ACTIVE_STREAMS.pop(request_id, None)
+    if stream is None:
+        return False
+    try:
+        stream.close()
+    except Exception:
+        pass
+    return True
+
+
+def _stream_chat(messages, model, request_id):
     """Generator that streams Ollama chat completion chunks as SSE."""
     app.logger.debug("Sending %d messages to model %s; first role: %s",
                      len(messages), model, messages[0]["role"] if messages else "none")
+    stream = None
     try:
         stream = client.chat.completions.create(
             model=model,
             messages=messages,
             stream=True,
         )
+        _register_stream(request_id, stream)
         for chunk in stream:
             delta = chunk.choices[0].delta if chunk.choices else None
             if delta and getattr(delta, "content", None):
@@ -176,6 +204,13 @@ def _stream_chat(messages, model):
         yield "data: [DONE]\n\n"
     except Exception as e:
         yield f"data: {json.dumps({'error': str(e)})}\n\n"
+    finally:
+        if stream is not None:
+            try:
+                stream.close()
+            except Exception:
+                pass
+        _unregister_stream(request_id)
 
 
 @app.route("/chat", methods=["POST"])
@@ -193,9 +228,10 @@ def chat():
         messages = [{"role": "system", "content": _SYSTEM_PROMPT}] + messages
 
     model = (data.get("model") or "").strip() or DEFAULT_MODEL
+    request_id = (data.get("request_id") or "").strip() or str(uuid.uuid4())
 
     return Response(
-        stream_with_context(_stream_chat(messages, model=model)),
+        stream_with_context(_stream_chat(messages, model=model, request_id=request_id)),
         mimetype="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -203,6 +239,16 @@ def chat():
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@app.route("/chat/stop", methods=["POST"])
+def stop_chat():
+    data = request.get_json(silent=True) or {}
+    request_id = (data.get("request_id") or "").strip()
+    if not request_id:
+        return jsonify({"error": "Missing 'request_id' in request body"}), 400
+    stopped = _stop_stream(request_id)
+    return jsonify({"ok": True, "stopped": stopped})
 
 
 @app.route("/threads", methods=["GET"])

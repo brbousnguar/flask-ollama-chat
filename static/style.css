@@ -681,6 +681,26 @@ body {
 .send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .send-icon { font-size: 0.9375rem; line-height: 1; }
 
+.stop-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  border-radius: 50%;
+  background: rgba(220, 38, 38, 0.1);
+  color: var(--error);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity var(--transition), transform var(--transition), background var(--transition);
+}
+.stop-btn:hover { opacity: 0.9; transform: scale(1.04); background: rgba(220, 38, 38, 0.14); }
+.stop-btn:active { transform: scale(0.97); }
+.stop-btn[hidden] { display: none !important; }
+.stop-icon { font-size: 0.75rem; line-height: 1; }
+
 /* ─── Status ───────────────────────────────────────────────────────────── */
 .status {
   padding: 0.4rem 1.25rem;
@@ -698,6 +718,7 @@ body {
   .message { max-width: 93%; }
   .input-row { padding: 0.5rem 0.75rem calc(env(safe-area-inset-bottom, 12px) + 12px) 0.75rem; }
   .new-chat-btn-bottom { width: 44px; height: 44px; }
+  .stop-btn { width: 44px; height: 44px; }
   .send-btn { width: 44px; height: 44px; }
   .model-dropdown-btn { width: 100%; min-width: 0; font-size: 0.9375rem; padding: 0.7rem 1rem; border-radius: 10px; max-width: 100%; }
   .header-row { gap: 0.5rem; }
@@ -725,6 +746,7 @@ body {
   .messages { padding-bottom: calc(88px + env(safe-area-inset-bottom, 12px)); }
   #user-input { padding: 0.875rem 1rem; font-size: 1rem; }
   .new-chat-btn-bottom { width: 48px; height: 48px; }
+  .stop-btn { width: 48px; height: 48px; }
   .send-btn { width: 48px; height: 48px; }
 }
 
