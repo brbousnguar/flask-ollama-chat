@@ -18,10 +18,17 @@
   const historyList = document.getElementById("history-list");
   const downloadChatsBtn = document.getElementById("download-chats-btn");
   const newChatSidebarBtn = document.getElementById("new-chat-sidebar-btn");
+  const memoryBtn = document.getElementById("memory-btn");
+  const memoryPanel = document.getElementById("memory-panel");
+  const memoryClose = document.getElementById("memory-close");
+  const memoryInput = document.getElementById("memory-input");
+  const memorySave = document.getElementById("memory-save");
+  const memoryClear = document.getElementById("memory-clear");
 
   let conversation = [];
   let localSessions = [];
   let activeSessionId = null;
+  let personalMemory = "";
   let activeRequestController = null;
   let activeRequestId = null;
   let isGenerating = false;
@@ -33,6 +40,7 @@
   const MODEL_PREFERENCE_KEY = 'preferredModel';
   const CHAT_SESSIONS_KEY = 'localChatSessions';
   const ACTIVE_CHAT_SESSION_KEY = 'activeLocalChatSessionId';
+  const PERSONAL_MEMORY_KEY = 'personalAssistantMemory';
 
   function genRequestId() {
     try {
@@ -105,6 +113,46 @@
       if (activeSessionId) localStorage.setItem(ACTIVE_CHAT_SESSION_KEY, activeSessionId);
       else localStorage.removeItem(ACTIVE_CHAT_SESSION_KEY);
     } catch (e) {}
+  }
+
+  function loadPersonalMemory() {
+    try {
+      return (localStorage.getItem(PERSONAL_MEMORY_KEY) || '').trim();
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function savePersonalMemory(value) {
+    personalMemory = (value || '').trim();
+    try {
+      if (personalMemory) localStorage.setItem(PERSONAL_MEMORY_KEY, personalMemory);
+      else localStorage.removeItem(PERSONAL_MEMORY_KEY);
+    } catch (e) {}
+    updateMemoryButtonState();
+  }
+
+  function updateMemoryButtonState() {
+    if (!memoryBtn) return;
+    memoryBtn.classList.toggle('has-memory', !!personalMemory);
+    memoryBtn.textContent = personalMemory ? 'Memory On' : 'Memory';
+  }
+
+  function openMemoryPanel() {
+    if (!memoryPanel) return;
+    memoryPanel.setAttribute('aria-hidden', 'false');
+    if (memoryBtn) memoryBtn.setAttribute('aria-expanded', 'true');
+    if (memoryInput) {
+      memoryInput.value = personalMemory;
+      memoryInput.focus();
+      memoryInput.setSelectionRange(memoryInput.value.length, memoryInput.value.length);
+    }
+  }
+
+  function closeMemoryPanel() {
+    if (!memoryPanel) return;
+    memoryPanel.setAttribute('aria-hidden', 'true');
+    if (memoryBtn) memoryBtn.setAttribute('aria-expanded', 'false');
   }
 
   function renderHistoryList() {
@@ -694,7 +742,12 @@
       const res = await fetch("/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: conversation, model, request_id: requestId }),
+        body: JSON.stringify({
+          messages: conversation,
+          model,
+          request_id: requestId,
+          memory: personalMemory,
+        }),
         signal: requestController.signal,
       });
 
@@ -826,6 +879,33 @@
   if (newChatSidebarBtn) newChatSidebarBtn.addEventListener("click", startNewChat);
   if (downloadChatsBtn) downloadChatsBtn.addEventListener("click", downloadStoredSessions);
   if (stopBtn) stopBtn.addEventListener("click", stopGeneration);
+  if (memoryBtn) memoryBtn.addEventListener("click", openMemoryPanel);
+  if (memoryClose) memoryClose.addEventListener("click", closeMemoryPanel);
+  if (memoryPanel) {
+    memoryPanel.addEventListener("click", e => {
+      if (e.target === memoryPanel) closeMemoryPanel();
+    });
+  }
+  if (memorySave) {
+    memorySave.addEventListener("click", () => {
+      savePersonalMemory(memoryInput ? memoryInput.value : "");
+      closeMemoryPanel();
+      setStatus(personalMemory ? "Memory saved" : "Memory cleared");
+    });
+  }
+  if (memoryClear) {
+    memoryClear.addEventListener("click", () => {
+      if (memoryInput) memoryInput.value = "";
+      savePersonalMemory("");
+      closeMemoryPanel();
+      setStatus("Memory cleared");
+    });
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && memoryPanel && memoryPanel.getAttribute('aria-hidden') === 'false') {
+      closeMemoryPanel();
+    }
+  });
 
   // ── Models panel ─────────────────────────────────────────────────────────
 
@@ -1280,6 +1360,8 @@
   async function initApp() {
     localSessions = loadStoredSessions();
     activeSessionId = localStorage.getItem(ACTIVE_CHAT_SESSION_KEY) || '';
+    personalMemory = loadPersonalMemory();
+    updateMemoryButtonState();
 
     if (!localSessions.length) {
       createSession({ messages: [] });

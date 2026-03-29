@@ -33,6 +33,7 @@
           </div>
           <select id="model-select" hidden aria-hidden="true"></select>
           <button type="button" id="models-btn" class="models-btn" aria-label="Browse models">Models</button>
+          <button type="button" id="memory-btn" class="memory-btn" aria-haspopup="true" aria-expanded="false" aria-controls="memory-panel">Memory</button>
           <button type="button" id="new-chat-btn" class="new-chat-btn" aria-label="Start new chat">New chat</button>
           <button id="install-btn" class="install-btn" aria-label="Install app" title="Install app" hidden>Install</button>
           <button id="access-btn" class="access-btn" aria-haspopup="true" aria-expanded="false" aria-controls="access-panel" title="Accessibility options">Aa</button>
@@ -91,6 +92,31 @@
 
         <div id="status" class="status" aria-live="polite"></div>
       </main>
+    </div>
+  </div>
+
+  <div id="memory-panel" class="memory-panel" aria-hidden="true" role="dialog" aria-labelledby="memory-title">
+    <div class="memory-sheet">
+      <div class="memory-header">
+        <div>
+          <h3 id="memory-title">Memory</h3>
+          <p class="memory-subtitle">Saved locally in this browser and included with each request.</p>
+        </div>
+        <button id="memory-close" class="memory-close" aria-label="Close memory panel">✕</button>
+      </div>
+
+      <label class="memory-label" for="memory-input">What should the assistant remember about you?</label>
+      <textarea
+        id="memory-input"
+        class="memory-input"
+        rows="8"
+        placeholder="Example: My name is Bruno. I prefer concise answers. I use Flask, Docker, and Ollama locally. English is fine, but simple wording helps."
+      ></textarea>
+
+      <div class="memory-actions">
+        <button type="button" id="memory-clear" class="memory-clear">Clear</button>
+        <button type="button" id="memory-save" class="memory-save">Save memory</button>
+      </div>
     </div>
   </div>
 

@@ -134,6 +134,123 @@ body {
   display: none;
 }
 
+.memory-panel {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.3);
+  z-index: 121;
+  padding: 1rem;
+}
+
+.memory-panel[aria-hidden="false"] { display: flex; }
+
+.memory-sheet {
+  width: min(100%, 620px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 1.25rem;
+}
+
+.memory-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.memory-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.memory-subtitle {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.memory-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.25rem;
+}
+
+.memory-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.memory-input {
+  width: 100%;
+  min-height: 180px;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-soft);
+  color: var(--text);
+  font: inherit;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+}
+
+.memory-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.memory-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.memory-clear,
+.memory-save {
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.memory-clear {
+  padding: 0.65rem 0.9rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.memory-clear:hover {
+  color: var(--text);
+  background: var(--surface-elevated);
+}
+
+.memory-save {
+  padding: 0.65rem 1rem;
+  background: var(--text);
+  border: 1px solid var(--text);
+  color: var(--surface);
+  font-weight: 600;
+}
+
+.memory-save:hover {
+  opacity: 0.92;
+}
+
 /* ─── Accessibility panel ──────────────────────────────────────────────── */
 .access-panel {
   position: fixed;
@@ -428,6 +545,30 @@ body {
 .header .new-chat-btn:hover {
   color: var(--text);
   background: var(--surface-elevated);
+}
+
+.memory-btn {
+  padding: 0.4rem 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.memory-btn:hover {
+  color: var(--text);
+  background: var(--surface-elevated);
+}
+
+.memory-btn.has-memory {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-glow);
 }
 
 .install-btn {

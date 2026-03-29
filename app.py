@@ -39,6 +39,23 @@ if os.path.isfile(_SYSTEM_PROMPT_PATH):
     with open(_SYSTEM_PROMPT_PATH, encoding="utf-8") as _f:
         _SYSTEM_PROMPT = _f.read().strip() or None
 
+
+def _build_system_prompt(memory_text):
+    """Compose the system prompt from the base prompt and optional user memory."""
+    parts = []
+    if _SYSTEM_PROMPT:
+        parts.append(_SYSTEM_PROMPT)
+
+    memory = (memory_text or "").strip()
+    if memory:
+        parts.append(
+            "User memory:\n"
+            f"{memory}\n\n"
+            "Use this only as helpful background. Do not claim facts you do not know, and do not mention this memory unless it is relevant."
+        )
+
+    return "\n\n".join(parts).strip() or None
+
 @app.route("/")
 def index():
     """Serve the single-page application."""
@@ -157,8 +174,13 @@ def chat():
     if not isinstance(messages, list):
         return jsonify({"error": "'messages' must be a list"}), 400
 
-    if _SYSTEM_PROMPT:
-        messages = [{"role": "system", "content": _SYSTEM_PROMPT}] + messages
+    memory = data.get("memory", "")
+    if memory is not None and not isinstance(memory, str):
+        return jsonify({"error": "'memory' must be a string"}), 400
+
+    system_prompt = _build_system_prompt(memory)
+    if system_prompt:
+        messages = [{"role": "system", "content": system_prompt}] + messages
 
     model = (data.get("model") or "").strip() or DEFAULT_MODEL
     request_id = (data.get("request_id") or "").strip() or str(uuid.uuid4())
