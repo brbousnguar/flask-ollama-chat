@@ -41,44 +41,57 @@
       <p class="subtitle">Powered by Ollama</p>
     </header>
 
-    <main class="chat-container">
-      <div id="messages" class="messages" role="log" aria-live="polite">
-        <div id="empty-state" class="empty-state">
-          <div class="empty-state-icon" aria-hidden="true">✧</div>
-          <p class="empty-state-title">Start a conversation</p>
-          <p class="empty-state-text">Send a message to get started.</p>
+    <div class="workspace">
+      <aside class="history-sidebar" aria-label="Past chats">
+        <div class="history-sidebar-header">
+          <button type="button" id="new-chat-sidebar-btn" class="history-new-chat-btn">New Chat</button>
+          <button type="button" id="download-chats-btn" class="history-download-btn">Download</button>
         </div>
-      </div>
 
-      <div id="typing-indicator" class="typing-indicator" aria-hidden="true" hidden>
-        <span class="typing-label">Thinking</span>
-        <span class="typing-wave" aria-hidden="true">
-          <span class="typing-dot"></span>
-          <span class="typing-dot"></span>
-          <span class="typing-dot"></span>
-        </span>
-      </div>
+        <div id="history-list" class="history-list">
+          <div class="history-empty">Your browser-saved chats will appear here.</div>
+        </div>
+      </aside>
 
-      <form id="chat-form" class="input-row" aria-label="Send a message">
-        <button type="button" id="new-chat-btn-bottom" class="new-chat-btn-bottom" aria-label="Start new chat">✚</button>
-        <textarea
-          id="user-input"
-          placeholder="Type a message..."
-          autocomplete="off"
-          aria-label="Message"
-          enterkeyhint="enter"
-          rows="1"
-        ></textarea>
-        <button type="button" id="stop-btn" class="stop-btn" aria-label="Stop generating" hidden>
-          <span class="stop-icon" aria-hidden="true">■</span>
-        </button>
-        <button type="submit" id="send-btn" class="send-btn" aria-label="Send">
-          <span class="send-icon" aria-hidden="true">→</span>
-        </button>
-      </form>
+      <main class="chat-container">
+        <div id="messages" class="messages" role="log" aria-live="polite">
+          <div id="empty-state" class="empty-state">
+            <div class="empty-state-icon" aria-hidden="true">✧</div>
+            <p class="empty-state-title">Start a conversation</p>
+            <p class="empty-state-text">Send a message to get started.</p>
+          </div>
+        </div>
 
-      <div id="status" class="status" aria-live="polite"></div>
-    </main>
+        <div id="typing-indicator" class="typing-indicator" aria-hidden="true" hidden>
+          <span class="typing-label">Thinking</span>
+          <span class="typing-wave" aria-hidden="true">
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+          </span>
+        </div>
+
+        <form id="chat-form" class="input-row" aria-label="Send a message">
+          <button type="button" id="new-chat-btn-bottom" class="new-chat-btn-bottom" aria-label="Start new chat">✚</button>
+          <textarea
+            id="user-input"
+            placeholder="Type a message..."
+            autocomplete="off"
+            aria-label="Message"
+            enterkeyhint="enter"
+            rows="1"
+          ></textarea>
+          <button type="button" id="stop-btn" class="stop-btn" aria-label="Stop generating" hidden>
+            <span class="stop-icon" aria-hidden="true">■</span>
+          </button>
+          <button type="submit" id="send-btn" class="send-btn" aria-label="Send">
+            <span class="send-icon" aria-hidden="true">→</span>
+          </button>
+        </form>
+
+        <div id="status" class="status" aria-live="polite"></div>
+      </main>
+    </div>
   </div>
 
   <!-- Models panel -->
@@ -160,6 +173,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=13"></script>
+  <script src="/static/app.js?v=14"></script>
 </body>
 </html>
