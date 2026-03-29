@@ -31,6 +31,41 @@
             </button>
             <div class="model-dropdown-list" id="model-dropdown-list" role="listbox" hidden></div>
           </div>
+          <div class="context-wrap" id="context-wrap">
+            <button type="button" id="context-indicator" class="context-indicator" aria-label="Estimated context window usage">
+              <span id="context-donut" class="context-donut" aria-hidden="true">
+                <span id="context-donut-value" class="context-donut-value">0%</span>
+              </span>
+            </button>
+            <div id="context-tooltip" class="context-tooltip" role="status" aria-live="polite">
+              <p class="context-tooltip-title">Estimated context usage</p>
+              <div class="context-metric-row">
+                <span>Total used</span>
+                <strong id="context-total-used">0 tokens</strong>
+              </div>
+              <div class="context-metric-row">
+                <span>Remaining</span>
+                <strong id="context-remaining">0 tokens</strong>
+              </div>
+              <div class="context-metric-row">
+                <span>Window size</span>
+                <strong id="context-window">Unknown</strong>
+              </div>
+              <div class="context-divider"></div>
+              <div class="context-metric-row">
+                <span>System prompt</span>
+                <strong id="context-system">0</strong>
+              </div>
+              <div class="context-metric-row">
+                <span>Saved memory</span>
+                <strong id="context-memory">0</strong>
+              </div>
+              <div class="context-metric-row">
+                <span>Conversation</span>
+                <strong id="context-conversation">0</strong>
+              </div>
+            </div>
+          </div>
           <select id="model-select" hidden aria-hidden="true"></select>
           <button type="button" id="models-btn" class="models-btn" aria-label="Browse models">Models</button>
           <button type="button" id="memory-btn" class="memory-btn" aria-haspopup="true" aria-expanded="false" aria-controls="memory-panel">Memory</button>

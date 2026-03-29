@@ -2,6 +2,7 @@
 Flask AI assistant using local Ollama.
 """
 import json
+import math
 import os
 import threading
 import urllib.request
@@ -31,6 +32,8 @@ client = OpenAI(
 DEFAULT_MODEL = os.environ.get("OLLAMA_MODEL", "gpt-oss:latest")
 _ACTIVE_STREAMS = {}
 _ACTIVE_STREAMS_LOCK = threading.Lock()
+_MODEL_CONTEXT_CACHE = {}
+_MODEL_CONTEXT_CACHE_LOCK = threading.Lock()
 
 # Optional system prompt loaded from an untracked local file
 _SYSTEM_PROMPT_PATH = os.path.join(os.path.dirname(__file__), "system_prompt.txt")
@@ -55,6 +58,67 @@ def _build_system_prompt(memory_text):
         )
 
     return "\n\n".join(parts).strip() or None
+
+
+def _estimate_tokens(text):
+    """Rough token estimate for UI budgeting."""
+    content = (text or "").strip()
+    if not content:
+        return 0
+    return max(1, math.ceil(len(content) / 4))
+
+
+def _estimate_messages_tokens(messages):
+    total = 0
+    for message in messages:
+        role = message.get("role", "")
+        content = message.get("content", "")
+        total += 4 + _estimate_tokens(role) + _estimate_tokens(content)
+    return total
+
+
+def _extract_context_window(show_data):
+    """Best-effort extraction of a model context window from Ollama show data."""
+    candidates = []
+    details = show_data.get("details") or {}
+    model_info = show_data.get("model_info") or {}
+
+    for source in (details, model_info, show_data):
+        if not isinstance(source, dict):
+            continue
+        for key, value in source.items():
+            key_name = str(key).lower()
+            if "context_length" in key_name or key_name in {"num_ctx", "context_window"}:
+                try:
+                    parsed = int(value)
+                except (TypeError, ValueError):
+                    continue
+                if parsed > 0:
+                    candidates.append(parsed)
+
+    return max(candidates) if candidates else 8192
+
+
+def _get_model_context_window(model):
+    with _MODEL_CONTEXT_CACHE_LOCK:
+        cached = _MODEL_CONTEXT_CACHE.get(model)
+    if cached:
+        return cached
+
+    payload = json.dumps({"model": model}).encode("utf-8")
+    req = urllib.request.Request(
+        f"{OLLAMA_BASE}/api/show",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        data = json.loads(resp.read().decode())
+
+    context_window = _extract_context_window(data)
+    with _MODEL_CONTEXT_CACHE_LOCK:
+        _MODEL_CONTEXT_CACHE[model] = context_window
+    return context_window
 
 @app.route("/")
 def index():
@@ -204,6 +268,53 @@ def stop_chat():
         return jsonify({"error": "Missing 'request_id' in request body"}), 400
     stopped = _stop_stream(request_id)
     return jsonify({"ok": True, "stopped": stopped})
+
+
+@app.route("/context-metrics", methods=["POST"])
+def context_metrics():
+    """Return estimated context window usage for a model and message set."""
+    data = request.get_json(silent=True) or {}
+    messages = data.get("messages", [])
+    model = (data.get("model") or "").strip() or DEFAULT_MODEL
+    memory = data.get("memory", "")
+
+    if not isinstance(messages, list):
+        return jsonify({"error": "'messages' must be a list"}), 400
+    if memory is not None and not isinstance(memory, str):
+        return jsonify({"error": "'memory' must be a string"}), 400
+
+    try:
+        context_window = _get_model_context_window(model)
+    except Exception:
+        context_window = 8192
+
+    system_tokens = _estimate_tokens(_SYSTEM_PROMPT)
+    memory_block = ""
+    if (memory or "").strip():
+        memory_block = (
+            "User memory:\n"
+            f"{memory.strip()}\n\n"
+            "Use this only as helpful background. Do not claim facts you do not know, and do not mention this memory unless it is relevant."
+        )
+    memory_tokens = _estimate_tokens(memory_block)
+    conversation_tokens = _estimate_messages_tokens(messages)
+    total_used = system_tokens + memory_tokens + conversation_tokens
+    remaining = max(context_window - total_used, 0)
+    usage_ratio = min(total_used / context_window, 1) if context_window else 0
+
+    return jsonify({
+        "model": model,
+        "context_window": context_window,
+        "used_tokens": total_used,
+        "remaining_tokens": remaining,
+        "usage_ratio": usage_ratio,
+        "breakdown": {
+            "system_prompt_tokens": system_tokens,
+            "memory_tokens": memory_tokens,
+            "conversation_tokens": conversation_tokens,
+        },
+        "estimated": True,
+    })
 
 @app.route("/service-worker.js")
 def service_worker_root():

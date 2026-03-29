@@ -23,6 +23,15 @@
   const memoryInput = document.getElementById("memory-input");
   const memorySave = document.getElementById("memory-save");
   const memoryClear = document.getElementById("memory-clear");
+  const contextIndicator = document.getElementById("context-indicator");
+  const contextDonut = document.getElementById("context-donut");
+  const contextDonutValue = document.getElementById("context-donut-value");
+  const contextTotalUsed = document.getElementById("context-total-used");
+  const contextRemaining = document.getElementById("context-remaining");
+  const contextWindow = document.getElementById("context-window");
+  const contextSystem = document.getElementById("context-system");
+  const contextMemory = document.getElementById("context-memory");
+  const contextConversation = document.getElementById("context-conversation");
 
   let conversation = [];
   let localSessions = [];
@@ -36,6 +45,8 @@
   let _localModels = [];
   let _libraryModels = [];
   let _libraryLoaded = false;
+  let _contextMetricsRequest = null;
+  let _contextMetricsTimer = null;
   const MODEL_PREFERENCE_KEY = 'preferredModel';
   const CHAT_SESSIONS_KEY = 'localChatSessions';
   const ACTIVE_CHAT_SESSION_KEY = 'activeLocalChatSessionId';
@@ -137,6 +148,81 @@
     memoryBtn.textContent = personalMemory ? 'Memory On' : 'Memory';
   }
 
+  function formatTokenCount(value) {
+    const num = Number(value || 0);
+    return num.toLocaleString() + ' tokens';
+  }
+
+  function renderContextMetrics(metrics) {
+    const ratio = Math.max(0, Math.min(Number(metrics && metrics.usage_ratio) || 0, 1));
+    const percent = Math.round(ratio * 100);
+    const used = Number(metrics && metrics.used_tokens) || 0;
+    const remaining = Number(metrics && metrics.remaining_tokens) || 0;
+    const windowSize = Number(metrics && metrics.context_window) || 0;
+    const breakdown = metrics && metrics.breakdown ? metrics.breakdown : {};
+
+    if (contextDonut) {
+      contextDonut.style.setProperty('--context-ratio', String(ratio));
+      contextDonut.classList.toggle('is-warning', percent >= 75 && percent < 90);
+      contextDonut.classList.toggle('is-danger', percent >= 90);
+    }
+    if (contextDonutValue) contextDonutValue.textContent = percent + '%';
+    if (contextIndicator) {
+      contextIndicator.setAttribute(
+        'aria-label',
+        'Estimated context usage ' + percent + ' percent, ' + formatTokenCount(remaining) + ' remaining'
+      );
+    }
+    if (contextTotalUsed) contextTotalUsed.textContent = formatTokenCount(used);
+    if (contextRemaining) contextRemaining.textContent = formatTokenCount(remaining);
+    if (contextWindow) contextWindow.textContent = windowSize ? formatTokenCount(windowSize) : 'Unknown';
+    if (contextSystem) contextSystem.textContent = formatTokenCount(breakdown.system_prompt_tokens || 0);
+    if (contextMemory) contextMemory.textContent = formatTokenCount(breakdown.memory_tokens || 0);
+    if (contextConversation) contextConversation.textContent = formatTokenCount(breakdown.conversation_tokens || 0);
+  }
+
+  async function updateContextMetrics() {
+    const model = modelSelect ? modelSelect.value : "";
+    if (!model) {
+      renderContextMetrics(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    if (_contextMetricsRequest) {
+      try { _contextMetricsRequest.abort(); } catch (e) {}
+    }
+    _contextMetricsRequest = controller;
+
+    try {
+      const response = await fetch('/context-metrics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          messages: conversation,
+          memory: personalMemory,
+        }),
+        signal: controller.signal,
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!controller.signal.aborted) renderContextMetrics(data);
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+    } finally {
+      if (_contextMetricsRequest === controller) _contextMetricsRequest = null;
+    }
+  }
+
+  function scheduleContextMetricsUpdate(delay = 120) {
+    if (_contextMetricsTimer) window.clearTimeout(_contextMetricsTimer);
+    _contextMetricsTimer = window.setTimeout(() => {
+      _contextMetricsTimer = null;
+      updateContextMetrics();
+    }, delay);
+  }
+
   function openMemoryPanel() {
     if (!memoryPanel) return;
     memoryPanel.setAttribute('aria-hidden', 'false');
@@ -223,6 +309,7 @@
     persistLocalSessions();
     renderHistoryList();
     renderMessages();
+    scheduleContextMetricsUpdate();
   }
 
   function loadStoredSessions() {
@@ -253,6 +340,7 @@
     renderMessages();
     resizeComposer();
     updateMessagesPadding();
+    scheduleContextMetricsUpdate();
     try { input.focus(); } catch (e) {}
   }
 
@@ -372,6 +460,7 @@
     }
     _closeModelDropdown();
     _renderModelsTab();
+    scheduleContextMetricsUpdate(0);
   }
 
   function _populateModelDropdown(models) {
@@ -605,6 +694,7 @@
       conversation = [];
       renderMessages();
       renderHistoryList();
+      scheduleContextMetricsUpdate();
       try { input.focus(); } catch (e) {}
       return;
     }
@@ -713,6 +803,7 @@
     conversation = conversation.slice(0, index);
     syncCurrentSession();
     renderMessages();
+    scheduleContextMetricsUpdate();
     await generateAssistantReply();
   }
 
@@ -800,6 +891,7 @@
       conversation.push({ role: "assistant", content: fullContent });
       syncCurrentSession();
       renderMessages();
+      scheduleContextMetricsUpdate();
       setStatus("");
     } catch (err) {
       stoppedByUser = err && err.name === "AbortError";
@@ -814,6 +906,7 @@
           conversation.push({ role: "assistant", content: fullContent });
           syncCurrentSession();
           renderMessages();
+          scheduleContextMetricsUpdate();
         }
       }
     } finally {
@@ -837,6 +930,7 @@
     addMessage("user", text);
     conversation.push({ role: "user", content: text });
     syncCurrentSession();
+    scheduleContextMetricsUpdate();
     await generateAssistantReply();
   }
 
@@ -888,6 +982,7 @@
     memorySave.addEventListener("click", () => {
       savePersonalMemory(memoryInput ? memoryInput.value : "");
       closeMemoryPanel();
+      scheduleContextMetricsUpdate(0);
       setStatus(personalMemory ? "Memory saved" : "Memory cleared");
     });
   }
@@ -896,6 +991,7 @@
       if (memoryInput) memoryInput.value = "";
       savePersonalMemory("");
       closeMemoryPanel();
+      scheduleContextMetricsUpdate(0);
       setStatus("Memory cleared");
     });
   }
@@ -1362,6 +1458,7 @@
     updateMemoryButtonState();
     persistLocalSessions();
     renderHistoryList();
+    renderContextMetrics(null);
 
     if (!localSessions.length) {
       createSession({ messages: [] });
@@ -1372,6 +1469,7 @@
     }
 
     await loadModels();
+    scheduleContextMetricsUpdate(0);
     setTimeout(() => {
       resizeComposer();
       updateMessagesPadding();
