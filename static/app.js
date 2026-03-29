@@ -17,7 +17,6 @@
   const inputRow = document.querySelector('.input-row');
   const historyList = document.getElementById("history-list");
   const downloadChatsBtn = document.getElementById("download-chats-btn");
-  const newChatSidebarBtn = document.getElementById("new-chat-sidebar-btn");
   const memoryBtn = document.getElementById("memory-btn");
   const memoryPanel = document.getElementById("memory-panel");
   const memoryClose = document.getElementById("memory-close");
@@ -876,7 +875,6 @@
 
   if (newChatBtn) newChatBtn.addEventListener("click", startNewChat);
   if (newChatBtnBottom) newChatBtnBottom.addEventListener("click", startNewChat);
-  if (newChatSidebarBtn) newChatSidebarBtn.addEventListener("click", startNewChat);
   if (downloadChatsBtn) downloadChatsBtn.addEventListener("click", downloadStoredSessions);
   if (stopBtn) stopBtn.addEventListener("click", stopGeneration);
   if (memoryBtn) memoryBtn.addEventListener("click", openMemoryPanel);
@@ -1362,6 +1360,8 @@
     activeSessionId = localStorage.getItem(ACTIVE_CHAT_SESSION_KEY) || '';
     personalMemory = loadPersonalMemory();
     updateMemoryButtonState();
+    persistLocalSessions();
+    renderHistoryList();
 
     if (!localSessions.length) {
       createSession({ messages: [] });
