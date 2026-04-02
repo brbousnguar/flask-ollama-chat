@@ -40,6 +40,8 @@
   let activeRequestController = null;
   let activeRequestId = null;
   let isGenerating = false;
+  let shouldAutoScroll = true;
+  const AUTO_SCROLL_THRESHOLD = 96;
 
   // shared state for models panel (populated by loadModels)
   let _localModels = [];
@@ -61,7 +63,8 @@
 
   // ── Chat rendering ────────────────────────────────────────────────────────
 
-  function renderMessages() {
+  function renderMessages(options = {}) {
+    const { forceScroll = false } = options;
     while (messagesEl.firstChild) messagesEl.removeChild(messagesEl.firstChild);
     if (emptyState) messagesEl.appendChild(emptyState);
     if (!conversation.length) { showEmptyState(true); return; }
@@ -70,7 +73,7 @@
       if (m.role === 'system') return;
       messagesEl.appendChild(createMessageNode(m.role, m.content, { index }));
     });
-    scrollToBottom();
+    scrollToBottom(forceScroll);
   }
 
   function canRewriteMessage(index) {
@@ -576,8 +579,24 @@
     }
   }
 
-  function ensureScrolled() {
-    try { messagesEl.scrollTop = messagesEl.scrollHeight; } catch (e) {}
+  function isNearBottom() {
+    try {
+      const remaining = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+      return remaining <= AUTO_SCROLL_THRESHOLD;
+    } catch (e) {
+      return true;
+    }
+  }
+
+  function updateAutoScrollState() {
+    shouldAutoScroll = isNearBottom();
+  }
+
+  function ensureScrolled(force = false) {
+    try {
+      if (force) shouldAutoScroll = true;
+      if (force || shouldAutoScroll) messagesEl.scrollTop = messagesEl.scrollHeight;
+    } catch (e) {}
   }
 
   function escapeHtml(str) {
@@ -715,7 +734,7 @@
   function showTyping(show) {
     typingIndicator.hidden = !show;
     typingIndicator.setAttribute("aria-hidden", show ? "false" : "true");
-    if (show) scrollToBottom();
+    if (show) scrollToBottom(true);
   }
 
   function setGeneratingState(generating) {
@@ -751,7 +770,9 @@
     }
   }
 
-  function scrollToBottom() {
+  function scrollToBottom(force = false) {
+    if (force) shouldAutoScroll = true;
+    if (!force && !shouldAutoScroll) return;
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
@@ -759,7 +780,7 @@
     showEmptyState(false);
     const node = createMessageNode(role, content, { isError });
     messagesEl.appendChild(node);
-    scrollToBottom();
+    scrollToBottom(true);
     return node;
   }
 
@@ -767,7 +788,7 @@
     showEmptyState(false);
     const node = createMessageNode("assistant", "", {});
     messagesEl.appendChild(node);
-    scrollToBottom();
+    scrollToBottom(true);
     return {
       wrapper: node,
       content: node.querySelector(".message.assistant"),
@@ -944,6 +965,7 @@
       sendMessage();
     }
   });
+  messagesEl.addEventListener("scroll", updateAutoScrollState, { passive: true });
   messagesEl.addEventListener("click", async e => {
     const btn = e.target.closest(".message-action-btn");
     if (!btn) return;
@@ -1473,7 +1495,7 @@
     setTimeout(() => {
       resizeComposer();
       updateMessagesPadding();
-      ensureScrolled();
+      ensureScrolled(true);
       try { input.focus(); } catch (e) {}
     }, 120);
   }
