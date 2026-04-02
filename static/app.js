@@ -40,6 +40,9 @@
   let activeRequestController = null;
   let activeRequestId = null;
   let isGenerating = false;
+  let activeAudio = null;
+  let activeAudioUrl = null;
+  let activeSpeakButton = null;
   let shouldAutoScroll = true;
   const AUTO_SCROLL_THRESHOLD = 96;
 
@@ -399,6 +402,14 @@
       copyBtn.dataset.content = content;
       copyBtn.textContent = 'Copy';
       actions.appendChild(copyBtn);
+
+      const speakBtn = document.createElement('button');
+      speakBtn.type = 'button';
+      speakBtn.className = 'message-action-btn';
+      speakBtn.dataset.action = 'speak';
+      speakBtn.dataset.content = content;
+      speakBtn.textContent = 'Speak';
+      actions.appendChild(speakBtn);
 
       if (typeof options.index === 'number' && canRewriteMessage(options.index)) {
         const rewriteBtn = document.createElement('button');
@@ -819,6 +830,75 @@
     }
   }
 
+  function resetSpeakState() {
+    if (activeAudio) {
+      try { activeAudio.pause(); } catch (e) {}
+      activeAudio = null;
+    }
+    if (activeAudioUrl) {
+      try { URL.revokeObjectURL(activeAudioUrl); } catch (e) {}
+      activeAudioUrl = null;
+    }
+    if (activeSpeakButton) {
+      activeSpeakButton.disabled = false;
+      activeSpeakButton.textContent = 'Speak';
+      activeSpeakButton = null;
+    }
+  }
+
+  async function speakMessage(text, button) {
+    if (!text) return;
+
+    if (activeSpeakButton === button && activeAudio) {
+      resetSpeakState();
+      setStatus('Stopped audio');
+      return;
+    }
+
+    resetSpeakState();
+    activeSpeakButton = button || null;
+    if (activeSpeakButton) {
+      activeSpeakButton.disabled = true;
+      activeSpeakButton.textContent = 'Loading...';
+    }
+
+    try {
+      const response = await fetch('/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Speech request failed');
+      }
+
+      const audioBlob = await response.blob();
+      activeAudioUrl = URL.createObjectURL(audioBlob);
+      activeAudio = new Audio(activeAudioUrl);
+      activeAudio.addEventListener('ended', () => {
+        resetSpeakState();
+        setStatus('Finished audio');
+      }, { once: true });
+      activeAudio.addEventListener('error', () => {
+        resetSpeakState();
+        setStatus('Audio playback failed', 'error');
+      }, { once: true });
+
+      if (activeSpeakButton) {
+        activeSpeakButton.disabled = false;
+        activeSpeakButton.textContent = 'Stop';
+      }
+
+      await activeAudio.play();
+      setStatus('Playing audio');
+    } catch (e) {
+      resetSpeakState();
+      setStatus(e && e.message ? e.message : 'Speech request failed', 'error');
+    }
+  }
+
   async function rewriteAssistantMessage(index) {
     if (isGenerating || !canRewriteMessage(index)) return;
     conversation = conversation.slice(0, index);
@@ -973,6 +1053,11 @@
     if (btn.dataset.action === "copy") {
       const ok = await copyToClipboard(btn.dataset.content || "");
       setStatus(ok ? "Copied response" : "Copy failed", ok ? "" : "error");
+      return;
+    }
+
+    if (btn.dataset.action === "speak") {
+      await speakMessage(btn.dataset.content || "", btn);
       return;
     }
 

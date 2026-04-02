@@ -22,6 +22,14 @@ from openai import OpenAI
 app = Flask(__name__, static_folder="static")
 
 OLLAMA_BASE = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+OPENAI_TTS_API_KEY = os.environ.get("OPENAI_TTS_API_KEY", "PASTE_OPENAI_API_KEY_HERE")
+OPENAI_TTS_MODEL = os.environ.get("OPENAI_TTS_MODEL", "gpt-4o-mini-tts")
+OPENAI_TTS_VOICE = os.environ.get("OPENAI_TTS_VOICE", "alloy")
+OPENAI_TTS_INSTRUCTIONS = os.environ.get(
+    "OPENAI_TTS_INSTRUCTIONS",
+    "Speak naturally, clearly, and with a friendly tone.",
+)
+_OPENAI_TTS_PLACEHOLDER = "PASTE_OPENAI_API_KEY_HERE"
 
 # Ollama OpenAI-compatible client
 client = OpenAI(
@@ -227,6 +235,15 @@ def _stream_chat(messages, model, request_id):
         _unregister_stream(request_id)
 
 
+def _get_tts_client():
+    return OpenAI(api_key=OPENAI_TTS_API_KEY)
+
+
+def _tts_is_configured():
+    token = (OPENAI_TTS_API_KEY or "").strip()
+    return bool(token) and token != _OPENAI_TTS_PLACEHOLDER
+
+
 @app.route("/chat", methods=["POST"])
 def chat():
     """Backend chat endpoint: streams assistant reply from Ollama as Server-Sent Events."""
@@ -268,6 +285,47 @@ def stop_chat():
         return jsonify({"error": "Missing 'request_id' in request body"}), 400
     stopped = _stop_stream(request_id)
     return jsonify({"ok": True, "stopped": stopped})
+
+
+@app.route("/tts", methods=["POST"])
+def text_to_speech():
+    data = request.get_json(silent=True) or {}
+    text = (data.get("text") or "").strip()
+
+    if not text:
+        return jsonify({"error": "Missing 'text' in request body"}), 400
+
+    if not _tts_is_configured():
+        return jsonify({
+            "error": (
+                "Text-to-speech is not configured yet. "
+                "Set OPENAI_TTS_API_KEY to a real OpenAI API key instead of the placeholder."
+            )
+        }), 503
+
+    # Keep requests bounded so the UI stays responsive and costs remain predictable.
+    text = text[:4000]
+
+    try:
+        with _get_tts_client().audio.speech.with_streaming_response.create(
+            model=OPENAI_TTS_MODEL,
+            voice=OPENAI_TTS_VOICE,
+            input=text,
+            instructions=OPENAI_TTS_INSTRUCTIONS,
+            response_format="mp3",
+        ) as response:
+            audio_bytes = response.read()
+    except Exception as e:
+        return jsonify({"error": f"TTS request failed: {e}"}), 502
+
+    return Response(
+        audio_bytes,
+        mimetype="audio/mpeg",
+        headers={
+            "Cache-Control": "no-store",
+            "Content-Disposition": 'inline; filename="reply.mp3"',
+        },
+    )
 
 
 @app.route("/context-metrics", methods=["POST"])

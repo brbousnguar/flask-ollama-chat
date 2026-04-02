@@ -3,10 +3,8 @@ services:
     build: .
     ports:
       - "5001:5000"
-    environment:
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
-      - OLLAMA_MODEL=gpt-oss:latest
-      - OLLAMA_API_KEY=ollama
+    env_file:
+      - .env
     volumes:
       - ./data:/app/data
       - ./system_prompt.txt:/app/system_prompt.txt:ro
